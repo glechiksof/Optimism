@@ -30,4 +30,19 @@ test.describe('Navigation smoke tests', () => {
     await page.goto('/this-does-not-exist')
     await expect(page.locator('text=404')).toBeVisible()
   })
+
+  test('team page loads', async ({ page }) => {
+    await page.goto('/teams/1')
+    await expect(page).toHaveURL('/teams/1')
+  })
+
+  test('account redirects unauthenticated user to /login', async ({ page }) => {
+    await page.goto('/account')
+    await expect(page).toHaveURL('/login')
+  })
+
+  test('profile redirects unauthenticated user to /login', async ({ page }) => {
+    await page.goto('/profile')
+    await expect(page).toHaveURL('/login')
+  })
 })
