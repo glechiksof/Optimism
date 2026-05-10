@@ -106,5 +106,9 @@ lib64/
 *.pfx
 secrets.json
 
+# ─── Playwright ──────────────────────────────────────────────────────────────────
+playwright-report/
+test-results/
+
 # ─── Miscellaneous ───────────────────────────────────────────────────────────────
 claude.md
