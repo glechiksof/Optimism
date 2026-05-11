@@ -6,6 +6,7 @@ interface User {
   email: string
   username: string
   avatar_url?: string
+  created_at?: string
 }
 
 interface AuthStore {

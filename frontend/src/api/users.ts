@@ -5,7 +5,7 @@ export interface User {
   email: string
   username: string
   avatar_url?: string
-  created_at?: string
+  created_at: string
 }
 
 export const getMe = (): Promise<User> => client.get('/users/me').then((r) => r.data)
