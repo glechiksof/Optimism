@@ -23,6 +23,12 @@ export default function Login() {
       return
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address')
+      return
+    }
+
     setLoading(true)
     try {
       const res = await login({ email, password })
@@ -51,7 +57,7 @@ export default function Login() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '2rem', textAlign: 'center' }}>
             Welcome Back!
           </h1>
-          <form aria-label="login form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <form aria-label="login form" onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <Input
               label="Email"
               type="email"

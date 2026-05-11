@@ -34,13 +34,14 @@ if (USE_MOCK) {
     const url = config.url || ''
     const method = config.method || 'get'
     const token = config.headers?.Authorization?.replace('Bearer ', '') || ''
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : (config.data ?? {})
 
     if (method === 'post' && url.includes('/auth/register')) {
-      return mockRegister(config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+      return mockRegister(body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     if (method === 'post' && url.includes('/auth/login')) {
-      return mockLogin(config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+      return mockLogin(body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     if (method === 'get' && url.includes('/users/me')) {
@@ -48,7 +49,7 @@ if (USE_MOCK) {
     }
 
     if (method === 'patch' && url.includes('/users/me')) {
-      return mockUpdateMe(token, config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+      return mockUpdateMe(token, body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     return Promise.reject(new Error('Unknown mock endpoint'))

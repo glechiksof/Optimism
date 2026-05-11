@@ -11,6 +11,8 @@ export function initMockData() {
       MOCK_USERS_KEY,
       JSON.stringify([
         { id: '1', email: 'demo@example.com', username: 'demo', password: 'password123', created_at: new Date().toISOString() },
+        { id: '2', email: 'player@test.com', username: 'player', password: 'Test1234!', created_at: new Date().toISOString() },
+        { id: '3', email: 'organizer@test.com', username: 'organizer', password: 'Test1234!', created_at: new Date().toISOString() },
       ])
     )
   }
