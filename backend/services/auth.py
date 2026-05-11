@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 from uuid import UUID
 
-import jwt
 from passlib.context import CryptContext
-from jose import JWTError
+from jose import jwt, JWTError
 
 from config import settings
 

@@ -1,9 +1,18 @@
-import axios from 'axios'
+import axios, { AxiosInstance } from 'axios'
+import { initMockData, mockRegister, mockLogin, mockGetMe, mockUpdateMe } from './mock'
+
+const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
+
+if (USE_MOCK) {
+  initMockData()
+}
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000',
   headers: { 'Content-Type': 'application/json' },
-})
+}) as AxiosInstance & { isMock?: boolean }
+
+client.isMock = USE_MOCK
 
 client.interceptors.request.use((config) => {
   const raw = localStorage.getItem('auth-storage')
@@ -19,6 +28,34 @@ client.interceptors.request.use((config) => {
   }
   return config
 })
+
+if (USE_MOCK) {
+  const mockAdapter = (config: any) => {
+    const url = config.url || ''
+    const method = config.method || 'get'
+    const token = config.headers?.Authorization?.replace('Bearer ', '') || ''
+
+    if (method === 'post' && url.includes('/auth/register')) {
+      return mockRegister(config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.includes('/auth/login')) {
+      return mockLogin(config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.includes('/users/me')) {
+      return mockGetMe(token).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'patch' && url.includes('/users/me')) {
+      return mockUpdateMe(token, config.data).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    return Promise.reject(new Error('Unknown mock endpoint'))
+  }
+
+  client.defaults.adapter = mockAdapter as any
+}
 
 client.interceptors.response.use(
   (res) => res,

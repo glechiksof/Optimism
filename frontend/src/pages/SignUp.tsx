@@ -50,8 +50,7 @@ export default function SignUp() {
   return (
     <div className="auth-layout">
       <div className="auth-layout__panel--left">
-        <img src="/title+logo.png" alt="Tournaments Organizer" style={{ height: 48, marginBottom: '3rem' }} />
-        <img src="/bg-left.png" alt="" style={{ width: '70%', maxWidth: 320 }} />
+        <img src="/title+logo.png" alt="Tournaments Organizer" style={{ height: 72, marginBottom: '3rem' }} />
         <h2 style={{ color: '#fff', marginTop: '2rem', fontSize: '1.5rem', fontWeight: 700 }}>
           Create, Join and Play
         </h2>
