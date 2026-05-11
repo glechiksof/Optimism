@@ -1,6 +1,52 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import Input from '../components/ui/Input'
+import Button from '../components/ui/Button'
+import FormError from '../components/ui/FormError'
+import { register } from '../api/auth'
+import { useAuthStore } from '../store/authStore'
 
 export default function SignUp() {
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+  const setAuth = useAuthStore((s) => s.setAuth)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    if (!username || !email || !password || !confirmPassword) {
+      setError('All fields are required')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await register({ email, username, password })
+      setAuth(res.access_token, res.user)
+      navigate('/')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Registration failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="auth-layout">
       <div className="auth-layout__panel--left">
@@ -16,39 +62,45 @@ export default function SignUp() {
       <div className="auth-layout__panel--right">
         <div style={{ width: '100%', maxWidth: 400 }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '2rem', textAlign: 'center' }}>
-            Join to us
+            Join Us
           </h1>
-          <form aria-label="signup form" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                Name
-              </label>
-              <input type="text" placeholder="Marianna" style={inputStyle} disabled />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                Username
-              </label>
-              <input type="text" placeholder="johndadev" style={inputStyle} disabled />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                Email
-              </label>
-              <input type="email" placeholder="johndoe@email.com" style={inputStyle} disabled />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                Password
-              </label>
-              <input type="password" placeholder="••••••••" style={inputStyle} disabled />
-            </div>
-            <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Sign-up wiring coming in Day 2 (T05)
-            </p>
-            <button type="submit" style={btnStyle} disabled>
-              Send verification code
-            </button>
+          <form aria-label="signup form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <Input
+              label="Username"
+              type="text"
+              placeholder="johndadev"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
+            />
+            <Input
+              label="Email"
+              type="email"
+              placeholder="johndoe@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+            />
+            <Input
+              label="Password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={loading}
+            />
+            <FormError message={error} />
+            <Button type="submit" loading={loading}>
+              CREATE ACCOUNT
+            </Button>
           </form>
           <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
             Already have an account?{' '}
@@ -58,28 +110,4 @@ export default function SignUp() {
       </div>
     </div>
   )
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.5rem 0',
-  border: 'none',
-  borderBottom: '1px solid var(--color-border)',
-  fontSize: '1rem',
-  outline: 'none',
-  background: 'transparent',
-}
-
-const btnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.85rem',
-  background: 'var(--color-primary)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 'var(--border-radius)',
-  fontWeight: 700,
-  fontSize: '0.9rem',
-  letterSpacing: '0.05em',
-  cursor: 'not-allowed',
-  opacity: 0.7,
 }
