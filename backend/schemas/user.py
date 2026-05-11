@@ -8,6 +8,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     username: str
+    avatar_url: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -16,4 +17,4 @@ class UserResponse(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     username: Optional[str] = None
-    email: Optional[EmailStr] = None
+    avatar_url: Optional[str] = None
