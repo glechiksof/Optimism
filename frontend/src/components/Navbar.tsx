@@ -23,6 +23,7 @@ export default function Navbar() {
         <div style={styles.links}>
           <NavLink
             to="/tournaments"
+            end
             style={({ isActive }) => ({ ...styles.link, ...(isActive ? styles.linkActive : {}) })}
           >
             Tournaments
@@ -134,7 +135,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   linkActive: {
     color: 'var(--color-primary)',
-    borderBottomColor: 'var(--color-primary)',
+    borderBottom: '2px solid var(--color-primary)',
   },
   right: {
     marginLeft: 'auto',
