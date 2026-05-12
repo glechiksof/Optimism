@@ -1,7 +1,9 @@
 import { AuthResponse } from './auth'
 import { User } from './users'
+import { Tournament, CreateTournamentData } from './tournaments'
 
 const MOCK_USERS_KEY = 'mock-users'
+const MOCK_TOURNAMENTS_KEY = 'mock-tournaments'
 const MOCK_DELAY = 500
 
 export function initMockData() {
@@ -110,6 +112,108 @@ export async function mockGetMe(token: string): Promise<User> {
         username: user.username,
         created_at: user.created_at,
       })
+    }, MOCK_DELAY)
+  })
+}
+
+function getMockTournaments(): Tournament[] {
+  const stored = localStorage.getItem(MOCK_TOURNAMENTS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveMockTournaments(tournaments: Tournament[]) {
+  localStorage.setItem(MOCK_TOURNAMENTS_KEY, JSON.stringify(tournaments))
+}
+
+function getUserIdFromToken(token: string): string {
+  return token.replace('mock-token-', '')
+}
+
+export async function mockCreateTournament(token: string, data: CreateTournamentData): Promise<Tournament> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      if (!userId) {
+        reject({ response: { data: { detail: 'Unauthorized' }, status: 401 } })
+        return
+      }
+      const now = new Date().toISOString()
+      const tournament: Tournament = {
+        id: Date.now().toString(),
+        organizer_id: userId,
+        name: data.name,
+        sport_type: data.sport_type,
+        bracket_type: data.bracket_type as Tournament['bracket_type'],
+        description: data.description,
+        max_participants: data.max_participants,
+        current_participants: 0,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        status: (data.status as Tournament['status']) ?? 'draft',
+        is_visible: data.is_visible,
+        created_at: now,
+        updated_at: now,
+      }
+      const all = getMockTournaments()
+      all.push(tournament)
+      saveMockTournaments(all)
+      resolve(tournament)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockUpdateTournament(token: string, id: string, data: Partial<CreateTournamentData>): Promise<Tournament> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const all = getMockTournaments()
+      const idx = all.findIndex((t) => t.id === id)
+      if (idx === -1) {
+        reject({ response: { data: { detail: 'Not found' }, status: 404 } })
+        return
+      }
+      if (all[idx].organizer_id !== userId) {
+        reject({ response: { data: { detail: 'Forbidden' }, status: 403 } })
+        return
+      }
+      all[idx] = { ...all[idx], ...data, updated_at: new Date().toISOString() }
+      saveMockTournaments(all)
+      resolve(all[idx])
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockListTournaments(search?: string): Promise<{ items: Tournament[]; total: number; page: number; page_size: number }> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      let items = getMockTournaments().filter(
+        (t) => t.status !== 'draft' && t.is_visible
+      )
+      if (search) {
+        const q = search.toLowerCase()
+        items = items.filter((t) => t.name.toLowerCase().includes(q))
+      }
+      resolve({ items, total: items.length, page: 1, page_size: 20 })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockGetHostedTournaments(token: string): Promise<Tournament[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const items = getMockTournaments().filter((t) => t.organizer_id === userId)
+      resolve(items)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockGetTournament(id: string): Promise<Tournament> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const t = getMockTournaments().find((t) => t.id === id)
+      if (!t) reject({ response: { data: { detail: 'Not found' }, status: 404 } })
+      else resolve(t)
     }, MOCK_DELAY)
   })
 }
