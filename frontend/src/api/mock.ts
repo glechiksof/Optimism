@@ -176,7 +176,13 @@ export async function mockUpdateTournament(token: string, id: string, data: Part
         reject({ response: { data: { detail: 'Forbidden' }, status: 403 } })
         return
       }
-      all[idx] = { ...all[idx], ...data, updated_at: new Date().toISOString() }
+      all[idx] = {
+        ...all[idx],
+        ...data,
+        bracket_type: (data.bracket_type ?? all[idx].bracket_type) as Tournament['bracket_type'],
+        status: (data.status ?? all[idx].status) as Tournament['status'],
+        updated_at: new Date().toISOString(),
+      }
       saveMockTournaments(all)
       resolve(all[idx])
     }, MOCK_DELAY)
