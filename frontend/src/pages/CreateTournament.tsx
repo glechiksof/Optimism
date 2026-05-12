@@ -5,7 +5,7 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import Toast from '../components/ui/Toast'
-import { createTournament } from '../api/tournaments'
+import { createTournament, updateTournament } from '../api/tournaments'
 
 const BRACKET_OPTIONS = [
   { value: 'single_elim', label: 'Single Elimination' },
@@ -58,7 +58,7 @@ export default function CreateTournament() {
 
     setLoading(true)
     try {
-      await createTournament({
+      const created = await createTournament({
         name: name.trim(),
         sport_type: sportType.trim(),
         bracket_type: bracketType,
@@ -67,8 +67,10 @@ export default function CreateTournament() {
         start_date: new Date(startDate).toISOString(),
         end_date: new Date(endDate).toISOString(),
         is_visible: status === 'draft' ? false : isVisible,
-        status,
       })
+      if (status === 'open') {
+        await updateTournament(created.id, { status: 'open', is_visible: isVisible })
+      }
       setToast({
         message: status === 'draft' ? 'Draft saved' : 'Tournament created',
         variant: 'success',

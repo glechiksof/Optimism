@@ -33,7 +33,6 @@ export interface CreateTournamentData {
   start_date: string
   end_date: string
   is_visible: boolean
-  status?: string
 }
 
 export interface UpdateTournamentData {
