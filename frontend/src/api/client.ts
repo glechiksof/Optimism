@@ -1,5 +1,10 @@
 import axios, { AxiosInstance } from 'axios'
-import { initMockData, mockRegister, mockLogin, mockGetMe, mockUpdateMe } from './mock'
+import {
+  initMockData,
+  mockRegister, mockLogin, mockGetMe, mockUpdateMe,
+  mockCreateTournament, mockUpdateTournament, mockListTournaments,
+  mockGetHostedTournaments, mockGetTournament,
+} from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
 
@@ -50,6 +55,29 @@ if (USE_MOCK) {
 
     if (method === 'patch' && url.includes('/users/me')) {
       return mockUpdateMe(token, body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url === '/tournaments') {
+      return mockCreateTournament(token, body).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'patch' && url.match(/^\/tournaments\/[^/]+$/)) {
+      const id = url.split('/').pop()!
+      return mockUpdateTournament(token, id, body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url === '/tournaments/hosted') {
+      return mockGetHostedTournaments(token).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url === '/tournaments') {
+      const search = config.params?.search
+      return mockListTournaments(search).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/tournaments\/[^/]+$/)) {
+      const id = url.split('/').pop()!
+      return mockGetTournament(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     return Promise.reject(new Error('Unknown mock endpoint'))
