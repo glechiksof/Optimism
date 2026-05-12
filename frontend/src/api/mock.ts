@@ -1,6 +1,6 @@
 import { AuthResponse } from './auth'
 import { User } from './users'
-import { Tournament, CreateTournamentData } from './tournaments'
+import { Tournament, CreateTournamentData, UpdateTournamentData } from './tournaments'
 
 const MOCK_USERS_KEY = 'mock-users'
 const MOCK_TOURNAMENTS_KEY = 'mock-tournaments'
@@ -149,7 +149,7 @@ export async function mockCreateTournament(token: string, data: CreateTournament
         current_participants: 0,
         start_date: data.start_date,
         end_date: data.end_date,
-        status: (data.status as Tournament['status']) ?? 'draft',
+        status: 'draft',
         is_visible: data.is_visible,
         created_at: now,
         updated_at: now,
@@ -162,7 +162,7 @@ export async function mockCreateTournament(token: string, data: CreateTournament
   })
 }
 
-export async function mockUpdateTournament(token: string, id: string, data: Partial<CreateTournamentData>): Promise<Tournament> {
+export async function mockUpdateTournament(token: string, id: string, data: UpdateTournamentData): Promise<Tournament> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const userId = getUserIdFromToken(token)
@@ -176,7 +176,13 @@ export async function mockUpdateTournament(token: string, id: string, data: Part
         reject({ response: { data: { detail: 'Forbidden' }, status: 403 } })
         return
       }
-      all[idx] = { ...all[idx], ...data, updated_at: new Date().toISOString() }
+      all[idx] = {
+        ...all[idx],
+        ...data,
+        bracket_type: (data.bracket_type ?? all[idx].bracket_type) as Tournament['bracket_type'],
+        status: (data.status ?? all[idx].status) as Tournament['status'],
+        updated_at: new Date().toISOString(),
+      }
       saveMockTournaments(all)
       resolve(all[idx])
     }, MOCK_DELAY)
