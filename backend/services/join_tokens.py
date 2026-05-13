@@ -19,11 +19,13 @@ def create_token(team_id: UUID, db: Session) -> JoinToken:
     return token
 
 
-def validate_token(token_str: str, db: Session) -> JoinToken:
-    """Validate token exists, is active, and not expired."""
+def validate_token(token_str: str, team_id: UUID, db: Session) -> JoinToken:
+    """Validate token exists, belongs to team, is active, and not expired."""
     token = db.query(JoinToken).filter(JoinToken.token == token_str).first()
     if not token:
         raise AppError(400, "Invalid token")
+    if token.team_id != team_id:
+        raise AppError(400, "Token not valid for this team")
     if not token.is_active:
         raise AppError(400, "Token is inactive")
     if token.expires_at < datetime.utcnow():

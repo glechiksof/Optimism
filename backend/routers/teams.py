@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from uuid import UUID
+from datetime import datetime
 
 from database import get_db
 from dependencies import get_current_user
+from exceptions import AppError
 from models.user import User
-from models.team import Team, TeamMember
 from models.join_token import JoinToken
+from models.membership import TeamMember
 from schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamListResponse, TeamMemberResponse
 from services.teams import (
     create_team,
@@ -23,7 +25,7 @@ from services.join_tokens import create_token
 class JoinTokenResponse(BaseModel):
     id: UUID
     token: str
-    expires_at: str
+    expires_at: datetime
 
     class Config:
         from_attributes = True
@@ -108,7 +110,6 @@ def create_join_token_endpoint(
     """Create join token (owner only)."""
     team = get_team_or_404(team_id, db)
     if team.created_by != current_user.id:
-        from exceptions import AppError
         raise AppError(403, "Only team creator can create tokens")
     token = create_token(team_id, db)
     return token
@@ -123,7 +124,6 @@ def list_join_tokens_endpoint(
     """List active join tokens (owner only)."""
     team = get_team_or_404(team_id, db)
     if team.created_by != current_user.id:
-        from exceptions import AppError
         raise AppError(403, "Only team creator can list tokens")
     tokens = db.query(JoinToken).filter(
         (JoinToken.team_id == team_id) & (JoinToken.is_active == True)
