@@ -4,6 +4,7 @@ import {
   mockRegister, mockLogin, mockGetMe, mockUpdateMe,
   mockCreateTournament, mockUpdateTournament, mockListTournaments,
   mockGetHostedTournaments, mockGetTournament,
+  mockCreateTeam, mockGetTeam, mockListTeams, mockJoinTeam,
 } from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
@@ -78,6 +79,24 @@ if (USE_MOCK) {
     if (method === 'get' && url.match(/^\/tournaments\/[^/]+$/)) {
       const id = url.split('/').pop()!
       return mockGetTournament(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url === '/teams') {
+      return mockCreateTeam(token, body).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'get' && url === '/teams') {
+      return mockListTeams(config.params).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/teams\/[^/]+\/join$/)) {
+      const id = url.split('/')[2]
+      return mockJoinTeam(token, id).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/teams\/[^/]+$/) && !url.includes('/tokens')) {
+      const id = url.split('/').pop()!
+      return mockGetTeam(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     return Promise.reject(new Error('Unknown mock endpoint'))

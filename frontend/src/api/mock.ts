@@ -1,9 +1,11 @@
 import { AuthResponse } from './auth'
 import { User } from './users'
 import { Tournament, CreateTournamentData, UpdateTournamentData } from './tournaments'
+import { Team, CreateTeamData } from './teams'
 
 const MOCK_USERS_KEY = 'mock-users'
 const MOCK_TOURNAMENTS_KEY = 'mock-tournaments'
+const MOCK_TEAMS_KEY = 'mock-teams'
 const MOCK_DELAY = 500
 
 export function initMockData() {
@@ -220,6 +222,90 @@ export async function mockGetTournament(id: string): Promise<Tournament> {
       const t = getMockTournaments().find((t) => t.id === id)
       if (!t) reject({ response: { data: { detail: 'Not found' }, status: 404 } })
       else resolve(t)
+    }, MOCK_DELAY)
+  })
+}
+
+function getMockTeams(): Team[] {
+  const stored = localStorage.getItem(MOCK_TEAMS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveMockTeams(teams: Team[]) {
+  localStorage.setItem(MOCK_TEAMS_KEY, JSON.stringify(teams))
+}
+
+export async function mockCreateTeam(token: string, data: CreateTeamData): Promise<Team> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      if (!userId) { reject({ response: { data: { detail: 'Unauthorized' }, status: 401 } }); return }
+      const now = new Date().toISOString()
+      const manualMembers = (data.manual_members ?? []).map((m, i) => ({
+        id: `manual-${Date.now()}-${i}`,
+        manual_name: m.name,
+        joined_at: now,
+      }))
+      if (manualMembers.length > data.capacity) {
+        reject({ response: { data: { message: `Manual members exceed capacity` }, status: 422 } }); return
+      }
+      const team: Team = {
+        id: Date.now().toString(),
+        name: data.name,
+        tournament_id: data.tournament_id,
+        capacity: data.capacity,
+        current_size: manualMembers.length,
+        join_method: data.join_method as Team['join_method'],
+        is_visible: data.is_visible,
+        created_by: userId,
+        members: manualMembers,
+        created_at: now,
+      }
+      const all = getMockTeams()
+      all.push(team)
+      saveMockTeams(all)
+      resolve(team)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockGetTeam(id: string): Promise<Team> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const team = getMockTeams().find((t) => t.id === id)
+      if (!team) reject({ response: { data: { detail: 'Not found' }, status: 404 } })
+      else resolve(team)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockListTeams(params?: { tournament_id?: string; visible_only?: boolean }): Promise<{ items: Team[]; total: number }> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      let items = getMockTeams()
+      if (params?.tournament_id) items = items.filter((t) => t.tournament_id === params.tournament_id)
+      if (params?.visible_only !== false) items = items.filter((t) => t.is_visible)
+      resolve({ items, total: items.length })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockJoinTeam(token: string, teamId: string): Promise<{ id: string; user_id: string; joined_at: string }> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      if (!userId) { reject({ response: { data: { detail: 'Unauthorized' }, status: 401 } }); return }
+      const teams = getMockTeams()
+      const team = teams.find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
+      if (team.join_method === 'manual') { reject({ response: { data: { message: 'Join is by manual invitation only' }, status: 403 } }); return }
+      if (team.members.some((m) => m.user_id === userId)) { reject({ response: { data: { message: 'Already a member of this team' }, status: 409 } }); return }
+      if (team.current_size >= team.capacity) { reject({ response: { data: { message: 'Team is full' }, status: 422 } }); return }
+      const member = { id: Date.now().toString(), user_id: userId, joined_at: new Date().toISOString() }
+      team.members.push(member)
+      team.current_size += 1
+      saveMockTeams(teams)
+      resolve(member)
     }, MOCK_DELAY)
   })
 }
