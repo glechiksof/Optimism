@@ -82,8 +82,22 @@ def delete_team(team_id: UUID, creator_id: UUID, db: Session) -> None:
 
 
 def join_team(team_id: UUID, user_id: UUID, token_str: str | None = None, db: Session = None) -> TeamMember:
-    """Join team based on join_method. Placeholder for detailed logic."""
+    """Join team based on join_method."""
+    from services.join_tokens import validate_token
+
     team = get_team_or_404(team_id, db)
+
+    # Check join_method
+    if team.join_method == "manual":
+        raise AppError(403, "Join is by manual invitation only")
+    elif team.join_method == "link":
+        if not token_str:
+            raise AppError(400, "Token required for link join")
+        validate_token(token_str, db)
+    elif team.join_method == "mixed":
+        if token_str:
+            validate_token(token_str, db)
+    # team_page: no token required
 
     # Check member count (real-time)
     member_count = _count_members(team_id, db)

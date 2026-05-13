@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -6,6 +7,7 @@ from database import get_db
 from dependencies import get_current_user
 from models.user import User
 from models.team import Team, TeamMember
+from models.join_token import JoinToken
 from schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamListResponse, TeamMemberResponse
 from services.teams import (
     create_team,
@@ -15,6 +17,20 @@ from services.teams import (
     delete_team,
     join_team,
 )
+from services.join_tokens import create_token
+
+
+class JoinTokenResponse(BaseModel):
+    id: UUID
+    token: str
+    expires_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class JoinRequest(BaseModel):
+    token: str | None = None
 
 router = APIRouter()
 
@@ -74,9 +90,42 @@ def delete_team_endpoint(
 @router.post("/teams/{team_id}/join", response_model=TeamMemberResponse, status_code=201)
 def join_team_endpoint(
     team_id: UUID,
+    data: JoinRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Join a team (placeholder for token handling)."""
-    member = join_team(team_id, current_user.id, db=db)
+    """Join a team with optional token."""
+    member = join_team(team_id, current_user.id, token_str=data.token, db=db)
     return member
+
+
+@router.post("/teams/{team_id}/tokens", response_model=JoinTokenResponse, status_code=201)
+def create_join_token_endpoint(
+    team_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create join token (owner only)."""
+    team = get_team_or_404(team_id, db)
+    if team.created_by != current_user.id:
+        from exceptions import AppError
+        raise AppError(403, "Only team creator can create tokens")
+    token = create_token(team_id, db)
+    return token
+
+
+@router.get("/teams/{team_id}/tokens", response_model=list[JoinTokenResponse])
+def list_join_tokens_endpoint(
+    team_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List active join tokens (owner only)."""
+    team = get_team_or_404(team_id, db)
+    if team.created_by != current_user.id:
+        from exceptions import AppError
+        raise AppError(403, "Only team creator can list tokens")
+    tokens = db.query(JoinToken).filter(
+        (JoinToken.team_id == team_id) & (JoinToken.is_active == True)
+    ).all()
+    return tokens
