@@ -8,6 +8,7 @@ import Tournaments from '../pages/Tournaments'
 import TournamentDetail from '../pages/TournamentDetail'
 import OngoingTournaments from '../pages/OngoingTournaments'
 import CreateTournament from '../pages/CreateTournament'
+import Teams from '../pages/Teams'
 import Team from '../pages/Team'
 import CreateTeam from '../pages/CreateTeam'
 import Account from '../pages/Account'
@@ -27,6 +28,7 @@ export default function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/tournaments" element={<Tournaments />} />
         <Route path="/tournaments/:id" element={<TournamentDetail />} />
+        <Route path="/teams" element={<Teams />} />
         <Route path="/teams/:id" element={<Team />} />
 
         {/* Protected routes */}

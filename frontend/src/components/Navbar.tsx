@@ -34,6 +34,12 @@ export default function Navbar() {
           >
             Ongoing
           </NavLink>
+          <NavLink
+            to="/teams"
+            style={({ isActive }) => ({ ...styles.link, ...(isActive ? styles.linkActive : {}) })}
+          >
+            Teams
+          </NavLink>
           {user && (
             <NavLink
               to="/create-tournament"
