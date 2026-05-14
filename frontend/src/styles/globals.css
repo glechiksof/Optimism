@@ -107,6 +107,25 @@ img {
   padding: 2rem 0;
 }
 
+/* Home split layout */
+.home-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: calc(100vh - var(--navbar-height));
+  margin: -2rem 0;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .home-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .home-layout__left {
+    display: none;
+  }
+}
+
 /* Utility */
 .sr-only {
   position: absolute;
