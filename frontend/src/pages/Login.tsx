@@ -44,13 +44,16 @@ export default function Login() {
   return (
     <div className="auth-layout">
       <div className="auth-layout__panel--left">
-        <img src="/title+logo.png" alt="Tournaments Organizer" style={{ height: 72, marginBottom: '3rem' }} />
-        <h2 style={{ color: '#fff', marginTop: '2rem', fontSize: '1.5rem', fontWeight: 700 }}>
-          Create, Join and Play
-        </h2>
-        <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '0.75rem', textAlign: 'center', lineHeight: 1.6 }}>
-          Find team to play in your city and create tournament brackets conveniently
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', width: '100%', maxWidth: 420 }}>
+          <img src="/title+logo.png" alt="Tournament Organizer" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+          <img src="/banana.png" alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+          <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', marginTop: '0.5rem' }}>
+            Create, Join and Play
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 1.6, marginTop: '-0.5rem' }}>
+            Find a team to play in your city and create tournament brackets conveniently
+          </p>
+        </div>
       </div>
       <div className="auth-layout__panel--right">
         <div style={{ width: '100%', maxWidth: 400 }}>

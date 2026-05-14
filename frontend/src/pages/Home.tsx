@@ -2,38 +2,72 @@ import { Link } from 'react-router-dom'
 
 export default function Home() {
   return (
-    <div style={styles.wrap}>
-      <div style={styles.hero}>
-        <img src="/Illustration.png" alt="" style={styles.illustration} />
-        <h1 style={styles.title}>Create, Join and Play</h1>
-        <p style={styles.subtitle}>
-          Find a team to play in your city and create tournament brackets conveniently
-        </p>
-        <div style={styles.actions}>
-          <Link to="/tournaments" style={styles.btnPrimary}>Browse Tournaments</Link>
-          <Link to="/create-tournament" style={styles.btnSecondary}>Create Tournament</Link>
+    <div className="home-layout">
+      <aside className="home-layout__left" style={styles.leftPanel}>
+        <div style={styles.leftStack}>
+          <img src="/title+logo.png" alt="Tournament Organizer" style={styles.titleLogo} />
+          <img src="/banana.png" alt="" style={styles.banana} />
         </div>
-      </div>
+      </aside>
+
+      <section style={styles.rightPanel}>
+        <div style={styles.hero}>
+          <h1 style={styles.title}>Create, Join and Play</h1>
+          <p style={styles.subtitle}>
+            Find a team to play in your city and create tournament brackets conveniently
+          </p>
+          <div style={styles.actions}>
+            <Link to="/tournaments" style={styles.btnPrimary}>Browse Tournaments</Link>
+            <Link to="/create-tournament" style={styles.btnSecondary}>Create Tournament</Link>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  wrap: {
+  leftPanel: {
+    backgroundColor: '#4287f5',
+    backgroundImage: 'url(/bg-left.png)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center bottom',
+    backgroundRepeat: 'no-repeat',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 'calc(100vh - var(--navbar-height))',
-    padding: '2rem',
+    padding: '3rem 2.5rem',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  leftStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1.5rem',
+    width: '100%',
+    maxWidth: '420px',
+  },
+  titleLogo: {
+    width: '100%',
+    height: 'auto',
+    objectFit: 'contain',
+  },
+  banana: {
+    width: '100%',
+    height: 'auto',
+    objectFit: 'contain',
+  },
+  rightPanel: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '3rem 2.5rem',
+    background: 'var(--color-bg)',
   },
   hero: {
     textAlign: 'center',
-    maxWidth: '560px',
-  },
-  illustration: {
-    width: '220px',
-    height: 'auto',
-    marginBottom: '2rem',
+    maxWidth: '480px',
   },
   title: {
     fontSize: '2.5rem',
