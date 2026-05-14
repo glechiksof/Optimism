@@ -6,7 +6,48 @@ import { Team, CreateTeamData } from './teams'
 const MOCK_USERS_KEY = 'mock-users'
 const MOCK_TOURNAMENTS_KEY = 'mock-tournaments'
 const MOCK_TEAMS_KEY = 'mock-teams'
+const MOCK_PARTICIPANTS_KEY = 'mock-participants'
+const MOCK_MATCHES_KEY = 'mock-matches'
 const MOCK_DELAY = 500
+
+export interface MockParticipant {
+  id: string
+  tournament_id: string
+  user_id?: string
+  team_id?: string
+  manual_name?: string
+  registered_at: string
+}
+
+export interface MockMatch {
+  id: string
+  tournament_id: string
+  round_number: number
+  match_number: number
+  participant_a: { id: string; user_id?: string; username?: string; manual_name?: string } | null
+  participant_b: { id: string; user_id?: string; username?: string; manual_name?: string } | null
+  winner_id: string | null
+  status: 'pending' | 'completed'
+  scheduled_at: string | null
+}
+
+function getMockParticipants(): MockParticipant[] {
+  const stored = localStorage.getItem(MOCK_PARTICIPANTS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveMockParticipants(rows: MockParticipant[]) {
+  localStorage.setItem(MOCK_PARTICIPANTS_KEY, JSON.stringify(rows))
+}
+
+function getMockMatches(): MockMatch[] {
+  const stored = localStorage.getItem(MOCK_MATCHES_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveMockMatches(rows: MockMatch[]) {
+  localStorage.setItem(MOCK_MATCHES_KEY, JSON.stringify(rows))
+}
 
 export function initMockData() {
   const stored = localStorage.getItem(MOCK_USERS_KEY)
@@ -343,6 +384,152 @@ export async function mockUpdateMe(token: string, data: { username?: string; ava
         avatar_url: user.avatar_url,
         created_at: user.created_at,
       })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockJoinTournament(token: string, tournamentId: string, body: { team_id?: string | null }) {
+  return new Promise<MockParticipant>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      if (!userId) { reject({ response: { data: { detail: 'Unauthorized' }, status: 401 } }); return }
+      const tournaments = getMockTournaments()
+      const tournament = tournaments.find((t) => t.id === tournamentId)
+      if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      if (!['open', 'published'].includes(tournament.status)) {
+        reject({ response: { data: { message: 'Tournament is not open for registration' }, status: 422 } }); return
+      }
+      const participants = getMockParticipants()
+      if (participants.some((p) => p.tournament_id === tournamentId && p.user_id === userId)) {
+        reject({ response: { data: { message: 'Already registered for this tournament' }, status: 409 } }); return
+      }
+      if (tournament.current_participants >= tournament.max_participants) {
+        reject({ response: { data: { message: 'Tournament is full' }, status: 422 } }); return
+      }
+      const participant: MockParticipant = {
+        id: Date.now().toString(),
+        tournament_id: tournamentId,
+        user_id: userId,
+        team_id: body.team_id ?? undefined,
+        registered_at: new Date().toISOString(),
+      }
+      participants.push(participant)
+      saveMockParticipants(participants)
+      tournament.current_participants += 1
+      saveMockTournaments(tournaments)
+      resolve(participant)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockListParticipants(tournamentId: string) {
+  return new Promise<{ items: MockParticipant[]; total: number }>((resolve) => {
+    setTimeout(() => {
+      const items = getMockParticipants().filter((p) => p.tournament_id === tournamentId)
+      resolve({ items, total: items.length })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockParticipationStatus(token: string, tournamentId: string) {
+  return new Promise<{ is_participant: boolean; participant_id: string | null }>((resolve) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const found = getMockParticipants().find((p) => p.tournament_id === tournamentId && p.user_id === userId)
+      resolve({ is_participant: !!found, participant_id: found?.id ?? null })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockGenerateMatches(token: string, tournamentId: string) {
+  return new Promise<{ items: MockMatch[]; total: number }>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const tournaments = getMockTournaments()
+      const tournament = tournaments.find((t) => t.id === tournamentId)
+      if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      if (tournament.organizer_id !== userId) { reject({ response: { data: { message: 'Only the organizer can perform this action' }, status: 403 } }); return }
+      const allMatches = getMockMatches()
+      if (allMatches.some((m) => m.tournament_id === tournamentId)) {
+        reject({ response: { data: { message: 'Matches already generated' }, status: 409 } }); return
+      }
+      const participants = getMockParticipants().filter((p) => p.tournament_id === tournamentId)
+      if (participants.length < 2) {
+        reject({ response: { data: { message: 'Need at least 2 participants to generate matches' }, status: 422 } }); return
+      }
+      const users = getMockUsers()
+      const shuffled = [...participants].sort(() => Math.random() - 0.5)
+      const n = shuffled.length
+      const numRounds = Math.ceil(Math.log2(n))
+      const bracket = 2 ** numRounds
+      const byes = bracket - n
+      const playing = shuffled.slice(byes)
+      const byeParticipants = shuffled.slice(0, byes)
+      const firstRoundCount = Math.floor(playing.length / 2)
+      const newMatches: MockMatch[] = []
+
+      function infoFor(p: MockParticipant) {
+        const u = p.user_id ? users.find((x) => x.id === p.user_id) : undefined
+        return { id: p.id, user_id: p.user_id, username: u?.username, manual_name: p.manual_name }
+      }
+
+      for (let i = 0; i < firstRoundCount; i++) {
+        newMatches.push({
+          id: `${Date.now()}-1-${i + 1}`,
+          tournament_id: tournamentId,
+          round_number: 1,
+          match_number: i + 1,
+          participant_a: infoFor(playing[i * 2]),
+          participant_b: infoFor(playing[i * 2 + 1]),
+          winner_id: null,
+          status: 'pending',
+          scheduled_at: null,
+        })
+      }
+      let prev = firstRoundCount + byes
+      for (let r = 2; r <= numRounds; r++) {
+        const cnt = Math.max(Math.floor(prev / 2), 1)
+        for (let i = 0; i < cnt; i++) {
+          newMatches.push({
+            id: `${Date.now()}-${r}-${i + 1}`,
+            tournament_id: tournamentId,
+            round_number: r,
+            match_number: i + 1,
+            participant_a: null,
+            participant_b: null,
+            winner_id: null,
+            status: 'pending',
+            scheduled_at: null,
+          })
+        }
+        prev = cnt
+      }
+      // Seed byes into round 2.
+      if (byes) {
+        const round2 = newMatches.filter((m) => m.round_number === 2)
+        let slot = 0
+        for (const bp of byeParticipants) {
+          if (slot >= round2.length * 2) break
+          const m = round2[Math.floor(slot / 2)]
+          if (slot % 2 === 0) m.participant_a = infoFor(bp)
+          else m.participant_b = infoFor(bp)
+          slot++
+        }
+      }
+      allMatches.push(...newMatches)
+      saveMockMatches(allMatches)
+      resolve({ items: newMatches, total: newMatches.length })
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockListMatches(tournamentId: string) {
+  return new Promise<{ items: MockMatch[]; total: number }>((resolve) => {
+    setTimeout(() => {
+      const items = getMockMatches()
+        .filter((m) => m.tournament_id === tournamentId)
+        .sort((a, b) => a.round_number - b.round_number || a.match_number - b.match_number)
+      resolve({ items, total: items.length })
     }, MOCK_DELAY)
   })
 }
