@@ -5,6 +5,8 @@ import {
   mockCreateTournament, mockUpdateTournament, mockListTournaments,
   mockGetHostedTournaments, mockGetTournament,
   mockCreateTeam, mockGetTeam, mockListTeams, mockJoinTeam,
+  mockJoinTournament, mockListParticipants, mockParticipationStatus,
+  mockGenerateMatches, mockListMatches,
 } from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
@@ -97,6 +99,31 @@ if (USE_MOCK) {
     if (method === 'get' && url.match(/^\/teams\/[^/]+$/) && !url.includes('/tokens')) {
       const id = url.split('/').pop()!
       return mockGetTeam(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/join$/)) {
+      const id = url.split('/')[2]
+      return mockJoinTournament(token, id, body).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/participants$/)) {
+      const id = url.split('/')[2]
+      return mockListParticipants(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/status$/)) {
+      const id = url.split('/')[2]
+      return mockParticipationStatus(token, id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/generate$/)) {
+      const id = url.split('/')[2]
+      return mockGenerateMatches(token, id).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/matches$/)) {
+      const id = url.split('/')[2]
+      return mockListMatches(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     return Promise.reject(new Error('Unknown mock endpoint'))
