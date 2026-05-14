@@ -8,6 +8,7 @@ from routers.auth import router as auth_router
 from routers.tournaments import router as tournaments_router
 from routers.users import router as users_router
 from routers.teams import router as teams_router
+from routers.participation import router as participation_router
 
 app = FastAPI(title="Tournament Organizer API")
 
@@ -26,6 +27,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(tournaments_router, prefix="/tournaments", tags=["tournaments"])
 app.include_router(teams_router, prefix="", tags=["teams"])
+app.include_router(participation_router, prefix="", tags=["participation"])
 
 
 @app.get("/health")
