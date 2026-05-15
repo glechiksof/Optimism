@@ -3,16 +3,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import SearchBar from '../components/SearchBar'
 import TournamentCard from '../components/TournamentCard'
 import { listTournaments, getHostedTournaments, type Tournament } from '../api/tournaments'
+import { getJoinedTournaments } from '../api/participation'
 import { useAuthStore } from '../store/authStore'
 
-type Tab = 'search' | 'hosted'
+type Tab = 'search' | 'hosted' | 'joined'
 
 export default function Tournaments() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
 
-  const initialTab = (searchParams.get('tab') as Tab) === 'hosted' ? 'hosted' : 'search'
+  const tabParam = searchParams.get('tab') as Tab | null
+  const initialTab: Tab = tabParam === 'hosted' || tabParam === 'joined' ? tabParam : 'search'
   const [tab, setTab] = useState<Tab>(initialTab)
 
   const [query, setQuery] = useState('')
@@ -23,11 +25,14 @@ export default function Tournaments() {
   const [hosted, setHosted] = useState<Tournament[]>([])
   const [loadingHosted, setLoadingHosted] = useState(false)
 
+  const [joined, setJoined] = useState<Tournament[]>([])
+  const [loadingJoined, setLoadingJoined] = useState(false)
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function switchTab(t: Tab) {
     setTab(t)
-    setSearchParams(t === 'hosted' ? { tab: 'hosted' } : {})
+    setSearchParams(t === 'search' ? {} : { tab: t })
   }
 
   useEffect(() => {
@@ -59,6 +64,16 @@ export default function Tournaments() {
       .finally(() => setLoadingHosted(false))
   }, [tab, user])
 
+  useEffect(() => {
+    if (tab !== 'joined') return
+    if (!user) return
+    setLoadingJoined(true)
+    getJoinedTournaments()
+      .then(setJoined)
+      .catch(() => setJoined([]))
+      .finally(() => setLoadingJoined(false))
+  }, [tab, user])
+
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: '0.625rem 1.25rem',
     fontWeight: active ? 700 : 400,
@@ -81,9 +96,14 @@ export default function Tournaments() {
             Search
           </button>
           {user && (
-            <button style={tabStyle(tab === 'hosted')} onClick={() => switchTab('hosted')}>
-              My Tournaments
-            </button>
+            <>
+              <button style={tabStyle(tab === 'hosted')} onClick={() => switchTab('hosted')}>
+                Hosting
+              </button>
+              <button style={tabStyle(tab === 'joined')} onClick={() => switchTab('joined')}>
+                Joined
+              </button>
+            </>
           )}
         </div>
 
@@ -161,6 +181,32 @@ export default function Tournaments() {
                 gap: '1rem',
               }}>
                 {hosted.map((t) => <TournamentCard key={t.id} tournament={t} />)}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'joined' && (
+          <>
+            {loadingJoined ? (
+              <p style={{ color: 'var(--color-text-muted)' }}>Loading...</p>
+            ) : joined.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--color-text-muted)' }}>
+                <p>You haven&apos;t joined any tournaments yet.</p>
+                <button
+                  onClick={() => switchTab('search')}
+                  style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}
+                >
+                  Browse tournaments →
+                </button>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '1rem',
+              }}>
+                {joined.map((t) => <TournamentCard key={t.id} tournament={t} />)}
               </div>
             )}
           </>

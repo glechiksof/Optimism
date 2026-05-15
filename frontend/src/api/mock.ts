@@ -396,7 +396,7 @@ export async function mockJoinTournament(token: string, tournamentId: string, bo
       const tournaments = getMockTournaments()
       const tournament = tournaments.find((t) => t.id === tournamentId)
       if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
-      if (!['open', 'published'].includes(tournament.status)) {
+      if (tournament.status !== 'open') {
         reject({ response: { data: { message: 'Tournament is not open for registration' }, status: 422 } }); return
       }
       const participants = getMockParticipants()
@@ -530,6 +530,286 @@ export async function mockListMatches(tournamentId: string) {
         .filter((m) => m.tournament_id === tournamentId)
         .sort((a, b) => a.round_number - b.round_number || a.match_number - b.match_number)
       resolve({ items, total: items.length })
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Transitions
+// ---------------------------------------------------------------------------
+const ALLOWED_TRANSITIONS: Record<string, string> = {
+  publish: 'open',
+  close: 'closed',
+  start: 'started',
+}
+const VALID_FROM: Record<string, string> = {
+  publish: 'draft',
+  close: 'open',
+  start: 'closed',
+}
+
+export async function mockTransition(token: string, tournamentId: string, action: 'publish' | 'close' | 'start') {
+  return new Promise<Tournament>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const all = getMockTournaments()
+      const idx = all.findIndex((t) => t.id === tournamentId)
+      if (idx === -1) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      const t = all[idx]
+      if (t.organizer_id !== userId) { reject({ response: { data: { message: 'Only the organizer' }, status: 403 } }); return }
+      if (t.status !== VALID_FROM[action]) {
+        reject({ response: { data: { message: `Cannot ${action} from status '${t.status}'` }, status: 422 } }); return
+      }
+      if (action === 'start') {
+        const matches = getMockMatches().filter((m) => m.tournament_id === tournamentId)
+        if (matches.length === 0) {
+          reject({ response: { data: { message: 'Generate the bracket before starting' }, status: 422 } }); return
+        }
+      }
+      t.status = ALLOWED_TRANSITIONS[action] as Tournament['status']
+      t.updated_at = new Date().toISOString()
+      saveMockTournaments(all)
+      resolve(t)
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Leave / kick
+// ---------------------------------------------------------------------------
+export async function mockLeaveTournament(token: string, tournamentId: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const parts = getMockParticipants()
+      const idx = parts.findIndex((p) => p.tournament_id === tournamentId && p.user_id === userId)
+      if (idx === -1) { reject({ response: { data: { message: 'Not registered' }, status: 404 } }); return }
+      const tournaments = getMockTournaments()
+      const t = tournaments.find((x) => x.id === tournamentId)
+      if (t && !['open', 'closed'].includes(t.status)) {
+        reject({ response: { data: { message: 'Cannot leave after the tournament has started' }, status: 422 } }); return
+      }
+      parts.splice(idx, 1)
+      saveMockParticipants(parts)
+      if (t && t.current_participants > 0) {
+        t.current_participants -= 1
+        saveMockTournaments(tournaments)
+      }
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockRemoveParticipant(token: string, tournamentId: string, participantId: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const tournaments = getMockTournaments()
+      const t = tournaments.find((x) => x.id === tournamentId)
+      if (!t) { reject({ response: { data: { message: 'Not found' }, status: 404 } }); return }
+      if (t.organizer_id !== userId) { reject({ response: { data: { message: 'Only the organizer' }, status: 403 } }); return }
+      if (!['open', 'closed'].includes(t.status)) {
+        reject({ response: { data: { message: 'Cannot remove participants after start' }, status: 422 } }); return
+      }
+      const parts = getMockParticipants()
+      const idx = parts.findIndex((p) => p.id === participantId && p.tournament_id === tournamentId)
+      if (idx === -1) { reject({ response: { data: { message: 'Participant not found' }, status: 404 } }); return }
+      parts.splice(idx, 1)
+      saveMockParticipants(parts)
+      if (t.current_participants > 0) {
+        t.current_participants -= 1
+        saveMockTournaments(tournaments)
+      }
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockLeaveTeam(token: string, teamId: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const teams = getMockTeams()
+      const team = teams.find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
+      if (team.created_by === userId) {
+        reject({ response: { data: { message: 'Creator cannot leave; delete instead' }, status: 422 } }); return
+      }
+      const memberIdx = team.members.findIndex((m) => m.user_id === userId)
+      if (memberIdx === -1) { reject({ response: { data: { message: 'Not a member' }, status: 404 } }); return }
+      team.members.splice(memberIdx, 1)
+      if (team.current_size > 0) team.current_size -= 1
+      saveMockTeams(teams)
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockRemoveMember(token: string, teamId: string, memberId: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const teams = getMockTeams()
+      const team = teams.find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Not found' }, status: 404 } }); return }
+      if (team.created_by !== userId) { reject({ response: { data: { message: 'Only creator' }, status: 403 } }); return }
+      const memberIdx = team.members.findIndex((m) => m.id === memberId)
+      if (memberIdx === -1) { reject({ response: { data: { message: 'Member not found' }, status: 404 } }); return }
+      if (team.members[memberIdx].user_id === userId) {
+        reject({ response: { data: { message: 'Creator cannot be removed' }, status: 422 } }); return
+      }
+      team.members.splice(memberIdx, 1)
+      if (team.current_size > 0) team.current_size -= 1
+      saveMockTeams(teams)
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Tokens
+// ---------------------------------------------------------------------------
+const MOCK_TOKENS_KEY = 'mock-tokens'
+
+interface MockToken {
+  id: string
+  team_id: string
+  token: string
+  expires_at: string
+  used_at: string | null
+  is_active: boolean
+}
+
+function getMockTokens(): MockToken[] {
+  const stored = localStorage.getItem(MOCK_TOKENS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveMockTokens(rows: MockToken[]) {
+  localStorage.setItem(MOCK_TOKENS_KEY, JSON.stringify(rows))
+}
+
+function randomToken(): string {
+  const arr = new Uint8Array(32)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map((b) => b.toString(36)).join('').slice(0, 43)
+}
+
+export async function mockGenerateToken(token: string, teamId: string) {
+  return new Promise<MockToken>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const team = getMockTeams().find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Not found' }, status: 404 } }); return }
+      if (team.created_by !== userId) { reject({ response: { data: { message: 'Only creator' }, status: 403 } }); return }
+      const row: MockToken = {
+        id: Date.now().toString(),
+        team_id: teamId,
+        token: randomToken(),
+        expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+        used_at: null,
+        is_active: true,
+      }
+      const all = getMockTokens()
+      all.push(row)
+      saveMockTokens(all)
+      resolve(row)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockGetTokens(token: string, teamId: string) {
+  return new Promise<MockToken[]>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const team = getMockTeams().find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Not found' }, status: 404 } }); return }
+      if (team.created_by !== userId) { reject({ response: { data: { message: 'Only creator' }, status: 403 } }); return }
+      resolve(getMockTokens().filter((t) => t.team_id === teamId))
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockRevokeToken(token: string, teamId: string, tokenId: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const team = getMockTeams().find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Not found' }, status: 404 } }); return }
+      if (team.created_by !== userId) { reject({ response: { data: { message: 'Only creator' }, status: 403 } }); return }
+      const all = getMockTokens()
+      const row = all.find((r) => r.id === tokenId && r.team_id === teamId)
+      if (!row) { reject({ response: { data: { message: 'Token not found' }, status: 404 } }); return }
+      row.is_active = false
+      saveMockTokens(all)
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Joined tournaments (single call for OngoingTournaments + joined sub-tab)
+// ---------------------------------------------------------------------------
+export async function mockJoinedTournaments(token: string) {
+  return new Promise<Tournament[]>((resolve) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const myParticipations = getMockParticipants().filter((p) => p.user_id === userId)
+      const tournamentIds = new Set(myParticipations.map((p) => p.tournament_id))
+      const items = getMockTournaments().filter((t) => tournamentIds.has(t.id))
+      resolve(items)
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+export async function mockMyStats(token: string) {
+  return new Promise<{ tournaments_organized: number; tournaments_joined: number; tournaments_won: number; matches_played: number; matches_won: number }>((resolve) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const organized = getMockTournaments().filter((t) => t.organizer_id === userId).length
+      const myParts = getMockParticipants().filter((p) => p.user_id === userId)
+      const partIds = new Set(myParts.map((p) => p.id))
+      const matches = getMockMatches().filter(
+        (m) => m.status === 'completed' && (
+          (m.participant_a && partIds.has(m.participant_a.id)) ||
+          (m.participant_b && partIds.has(m.participant_b.id))
+        )
+      )
+      const matches_won = matches.filter((m) => m.winner_id && partIds.has(m.winner_id)).length
+      resolve({
+        tournaments_organized: organized,
+        tournaments_joined: myParts.length,
+        tournaments_won: 0,  // not computed in mock
+        matches_played: matches.length,
+        matches_won,
+      })
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Standings (round-robin)
+// ---------------------------------------------------------------------------
+export async function mockStandings(tournamentId: string) {
+  return new Promise<{ items: any[] }>((resolve) => {
+    setTimeout(() => {
+      const matches = getMockMatches().filter((m) => m.tournament_id === tournamentId && m.status === 'completed')
+      const stats: Record<string, any> = {}
+      for (const p of getMockParticipants().filter((p) => p.tournament_id === tournamentId)) {
+        const user = getMockUsers().find((u) => u.id === p.user_id)
+        stats[p.id] = { participant_id: p.id, username: user?.username, manual_name: p.manual_name, wins: 0, losses: 0, played: 0 }
+      }
+      for (const m of matches) {
+        if (!m.winner_id) continue
+        const loser = m.winner_id === m.participant_a?.id ? m.participant_b?.id : m.participant_a?.id
+        if (stats[m.winner_id]) { stats[m.winner_id].wins++; stats[m.winner_id].played++ }
+        if (loser && stats[loser]) { stats[loser].losses++; stats[loser].played++ }
+      }
+      const rows = Object.values(stats).sort((a, b) => b.wins - a.wins || a.losses - b.losses)
+      resolve({ items: rows })
     }, MOCK_DELAY)
   })
 }

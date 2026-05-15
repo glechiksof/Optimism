@@ -23,7 +23,7 @@ export default function JoinTournamentButton({
     return <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>✓ You are registered</span>
   }
 
-  if (status !== 'open' && status !== 'published') {
+  if (status !== 'open') {
     return <span style={{ color: 'var(--color-text-muted)' }}>Registration not open</span>
   }
 

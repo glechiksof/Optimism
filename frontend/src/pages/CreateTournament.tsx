@@ -5,7 +5,7 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import Toast from '../components/ui/Toast'
-import { createTournament, updateTournament } from '../api/tournaments'
+import { createTournament, publishTournament } from '../api/tournaments'
 
 const BRACKET_OPTIONS = [
   { value: 'single_elim', label: 'Single Elimination' },
@@ -69,7 +69,7 @@ export default function CreateTournament() {
         is_visible: status === 'draft' ? false : isVisible,
       })
       if (status === 'open') {
-        await updateTournament(created.id, { status: 'open', is_visible: isVisible })
+        await publishTournament(created.id)
       }
       setToast({
         message: status === 'draft' ? 'Draft saved' : 'Tournament created',

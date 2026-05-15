@@ -33,3 +33,18 @@ export async function getParticipationStatus(id: string): Promise<ParticipationS
   const res = await client.get<ParticipationStatus>(`/tournaments/${id}/status`)
   return res.data
 }
+
+export async function leaveTournament(id: string): Promise<void> {
+  await client.delete(`/tournaments/${id}/leave`)
+}
+
+export async function removeParticipant(tournamentId: string, participantId: string): Promise<void> {
+  await client.delete(`/tournaments/${tournamentId}/participants/${participantId}`)
+}
+
+// Tournaments the current user is registered for (full Tournament objects).
+import type { Tournament } from './tournaments'
+export async function getJoinedTournaments(): Promise<Tournament[]> {
+  const res = await client.get<Tournament[]>('/users/me/joined-tournaments')
+  return res.data
+}

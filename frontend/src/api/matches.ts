@@ -46,3 +46,21 @@ export async function submitMatchResult(
   )
   return res.data
 }
+
+export interface StandingsRow {
+  participant_id: string
+  username?: string
+  manual_name?: string
+  wins: number
+  losses: number
+  played: number
+}
+
+export interface StandingsResponse {
+  items: StandingsRow[]
+}
+
+export async function getStandings(tournamentId: string): Promise<StandingsResponse> {
+  const res = await client.get<StandingsResponse>(`/tournaments/${tournamentId}/standings`)
+  return res.data
+}
