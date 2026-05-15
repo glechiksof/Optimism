@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore'
 import CapacityBar from '../components/CapacityBar'
 import JoinButton from '../components/JoinButton'
 import TeamTokenManager from '../components/TeamTokenManager'
+import Toast from '../components/ui/Toast'
 
 const JOIN_METHOD_LABELS: Record<string, string> = {
   team_page: 'Open',
@@ -22,6 +23,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null)
 
   function load() {
     if (!id) return
@@ -41,6 +43,7 @@ export default function TeamPage() {
     try {
       await leaveTeam(team.id)
       load()
+      setToast({ message: 'You left the team', variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? 'Failed to leave team')
     }
@@ -53,6 +56,7 @@ export default function TeamPage() {
     try {
       await removeMember(team.id, memberId)
       load()
+      setToast({ message: 'Member removed', variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? 'Failed to remove member')
     }
@@ -79,6 +83,7 @@ export default function TeamPage() {
 
   return (
     <div className="page">
+      {toast && <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />}
       <div className="container" style={{ maxWidth: 680 }}>
         {/* Privacy banner */}
         {!team.is_visible && (

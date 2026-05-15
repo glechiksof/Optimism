@@ -8,7 +8,7 @@ const MOCK_TOURNAMENTS_KEY = 'mock-tournaments'
 const MOCK_TEAMS_KEY = 'mock-teams'
 const MOCK_PARTICIPANTS_KEY = 'mock-participants'
 const MOCK_MATCHES_KEY = 'mock-matches'
-const MOCK_DELAY = 500
+const MOCK_DELAY = 120
 
 export interface MockParticipant {
   id: string
@@ -331,21 +331,73 @@ export async function mockListTeams(params?: { tournament_id?: string; visible_o
   })
 }
 
-export async function mockJoinTeam(token: string, teamId: string): Promise<{ id: string; user_id: string; joined_at: string }> {
+export async function mockJoinTeam(authToken: string, teamId: string, joinTokenStr: string | null): Promise<{ id: string; user_id: string; joined_at: string }> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      const userId = getUserIdFromToken(token)
+      const userId = getUserIdFromToken(authToken)
       if (!userId) { reject({ response: { data: { detail: 'Unauthorized' }, status: 401 } }); return }
       const teams = getMockTeams()
       const team = teams.find((t) => t.id === teamId)
       if (!team) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
-      if (team.join_method === 'manual') { reject({ response: { data: { message: 'Join is by manual invitation only' }, status: 403 } }); return }
-      if (team.members.some((m) => m.user_id === userId)) { reject({ response: { data: { message: 'Already a member of this team' }, status: 409 } }); return }
-      if (team.current_size >= team.capacity) { reject({ response: { data: { message: 'Team is full' }, status: 422 } }); return }
+
+      let consumedTokenId: string | null = null
+
+      // Method-specific guards
+      if (team.join_method === 'manual') {
+        reject({ response: { data: { message: 'Join is by manual invitation only' }, status: 403 } }); return
+      } else if (team.join_method === 'link') {
+        if (!joinTokenStr) {
+          reject({ response: { data: { message: 'Token required for link join' }, status: 400 } }); return
+        }
+        const tokRows = getMockTokens()
+        const row = tokRows.find((t) => t.token === joinTokenStr)
+        if (!row || row.team_id !== teamId) {
+          reject({ response: { data: { message: 'Invalid token' }, status: 400 } }); return
+        }
+        if (!row.is_active) {
+          reject({ response: { data: { message: 'Token is inactive' }, status: 400 } }); return
+        }
+        if (row.used_at) {
+          reject({ response: { data: { message: 'Token has already been used' }, status: 400 } }); return
+        }
+        if (new Date(row.expires_at) < new Date()) {
+          reject({ response: { data: { message: 'Token expired' }, status: 400 } }); return
+        }
+        consumedTokenId = row.id
+      } else if (team.join_method === 'mixed') {
+        if (joinTokenStr) {
+          const tokRows = getMockTokens()
+          const row = tokRows.find((t) => t.token === joinTokenStr && t.team_id === teamId)
+          if (!row || !row.is_active || row.used_at || new Date(row.expires_at) < new Date()) {
+            reject({ response: { data: { message: 'Invalid or used token' }, status: 400 } }); return
+          }
+          consumedTokenId = row.id
+        }
+      }
+      // team_page: no token check
+
+      if (team.members.some((m) => m.user_id === userId)) {
+        reject({ response: { data: { message: 'Already a member of this team' }, status: 409 } }); return
+      }
+      if (team.current_size >= team.capacity) {
+        reject({ response: { data: { message: 'Team is full' }, status: 422 } }); return
+      }
+
       const member = { id: Date.now().toString(), user_id: userId, joined_at: new Date().toISOString() }
       team.members.push(member)
       team.current_size += 1
       saveMockTeams(teams)
+
+      // Single-use: deactivate token after successful consumption
+      if (consumedTokenId) {
+        const tokRows = getMockTokens()
+        const row = tokRows.find((t) => t.id === consumedTokenId)
+        if (row) {
+          row.used_at = new Date().toISOString()
+          row.is_active = false
+          saveMockTokens(tokRows)
+        }
+      }
       resolve(member)
     }, MOCK_DELAY)
   })

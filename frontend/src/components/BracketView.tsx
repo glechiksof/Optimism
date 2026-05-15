@@ -3,9 +3,12 @@ import MatchCard from './MatchCard'
 
 interface Props {
   matches: Match[]
+  tournamentId: string
+  canPickWinner?: boolean
+  onResult?: () => void
 }
 
-export default function BracketView({ matches }: Props) {
+export default function BracketView({ matches, tournamentId, canPickWinner = false, onResult }: Props) {
   if (matches.length === 0) {
     return (
       <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
@@ -29,7 +32,7 @@ export default function BracketView({ matches }: Props) {
       paddingBottom: '0.5rem',
     }}>
       {sortedRoundNums.map((rn) => (
-        <div key={rn} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 220 }}>
+        <div key={rn} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 240 }}>
           <h3 style={{
             fontSize: '0.875rem',
             fontWeight: 700,
@@ -41,7 +44,13 @@ export default function BracketView({ matches }: Props) {
             Round {rn}
           </h3>
           {rounds.get(rn)!.sort((a, b) => a.match_number - b.match_number).map((m) => (
-            <MatchCard key={m.id} match={m} />
+            <MatchCard
+              key={m.id}
+              match={m}
+              tournamentId={tournamentId}
+              canPickWinner={canPickWinner}
+              onResult={onResult}
+            />
           ))}
         </div>
       ))}
