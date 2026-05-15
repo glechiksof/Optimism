@@ -7,6 +7,10 @@ import {
   mockCreateTeam, mockGetTeam, mockListTeams, mockJoinTeam,
   mockJoinTournament, mockListParticipants, mockParticipationStatus,
   mockGenerateMatches, mockListMatches,
+  mockTransition, mockLeaveTournament, mockRemoveParticipant,
+  mockLeaveTeam, mockRemoveMember,
+  mockGenerateToken, mockGetTokens, mockRevokeToken,
+  mockJoinedTournaments, mockMyStats, mockStandings,
 } from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
@@ -124,6 +128,69 @@ if (USE_MOCK) {
     if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/matches$/)) {
       const id = url.split('/')[2]
       return mockListMatches(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/standings$/)) {
+      const id = url.split('/')[2]
+      return mockStandings(id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/publish$/)) {
+      const id = url.split('/')[2]
+      return mockTransition(token, id, 'publish').then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/close$/)) {
+      const id = url.split('/')[2]
+      return mockTransition(token, id, 'close').then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/start$/)) {
+      const id = url.split('/')[2]
+      return mockTransition(token, id, 'start').then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/tournaments\/[^/]+\/leave$/)) {
+      const id = url.split('/')[2]
+      return mockLeaveTournament(token, id).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/tournaments\/[^/]+\/participants\/[^/]+$/)) {
+      const parts = url.split('/')
+      return mockRemoveParticipant(token, parts[2], parts[4]).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/teams\/[^/]+\/leave$/)) {
+      const id = url.split('/')[2]
+      return mockLeaveTeam(token, id).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/teams\/[^/]+\/members\/[^/]+$/)) {
+      const parts = url.split('/')
+      return mockRemoveMember(token, parts[2], parts[4]).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/teams\/[^/]+\/tokens$/)) {
+      const id = url.split('/')[2]
+      return mockGenerateToken(token, id).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'get' && url.match(/^\/teams\/[^/]+\/tokens$/)) {
+      const id = url.split('/')[2]
+      return mockGetTokens(token, id).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/teams\/[^/]+\/tokens\/[^/]+$/)) {
+      const parts = url.split('/')
+      return mockRevokeToken(token, parts[2], parts[4]).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'get' && url === '/users/me/joined-tournaments') {
+      return mockJoinedTournaments(token).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'get' && url === '/users/me/stats') {
+      return mockMyStats(token).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     return Promise.reject(new Error('Unknown mock endpoint'))

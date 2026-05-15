@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getTournament, type Tournament } from '../api/tournaments'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import {
+  getTournament,
+  publishTournament, closeTournament, startTournament,
+  type Tournament,
+} from '../api/tournaments'
 import {
   listParticipants, getParticipationStatus,
+  leaveTournament, removeParticipant,
   type Participant, type ParticipationStatus,
 } from '../api/participation'
-import { listMatches, generateMatches, type Match } from '../api/matches'
+import { listMatches, generateMatches, getStandings, type Match, type StandingsRow } from '../api/matches'
 import { useAuthStore } from '../store/authStore'
 import JoinTournamentButton from '../components/JoinTournamentButton'
 import BracketView from '../components/BracketView'
@@ -13,7 +18,6 @@ import BracketView from '../components/BracketView'
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   open: 'Open for registration',
-  published: 'Open for registration',
   closed: 'Registration closed',
   started: 'In progress',
   finished: 'Finished',
@@ -27,10 +31,13 @@ export default function TournamentDetail() {
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [matches, setMatches] = useState<Match[]>([])
+  const [standings, setStandings] = useState<StandingsRow[]>([])
   const [status, setStatus] = useState<ParticipationStatus>({ is_participant: false, participant_id: null })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [transitioning, setTransitioning] = useState(false)
 
   async function load() {
     if (!id) return
@@ -45,6 +52,14 @@ export default function TournamentDetail() {
       setTournament(t)
       setParticipants(parts.items)
       setMatches(ms.items)
+      if (t.bracket_type === 'round_robin') {
+        try {
+          const s = await getStandings(id)
+          setStandings(s.items)
+        } catch { setStandings([]) }
+      } else {
+        setStandings([])
+      }
       if (user) {
         try {
           const s = await getParticipationStatus(id)
@@ -67,13 +82,54 @@ export default function TournamentDetail() {
   async function handleGenerate() {
     if (!id) return
     setGenerating(true)
+    setActionError('')
     try {
-      const res = await generateMatches(id)
-      setMatches(res.items)
+      await generateMatches(id)
+      await load()
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? 'Failed to generate matches')
+      setActionError(e?.response?.data?.message ?? 'Failed to generate matches')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function runTransition(action: 'publish' | 'close' | 'start') {
+    if (!id) return
+    setTransitioning(true)
+    setActionError('')
+    try {
+      const fn = action === 'publish' ? publishTournament : action === 'close' ? closeTournament : startTournament
+      await fn(id)
+      await load()
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message ?? `Failed to ${action} tournament`)
+    } finally {
+      setTransitioning(false)
+    }
+  }
+
+  async function handleLeave() {
+    if (!id || !tournament) return
+    if (!confirm(`Cancel your registration in ${tournament.name}?`)) return
+    setActionError('')
+    try {
+      await leaveTournament(id)
+      await load()
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message ?? 'Failed to leave tournament')
+    }
+  }
+
+  async function handleKick(p: Participant) {
+    if (!id || !tournament) return
+    const label = p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'this participant')
+    if (!confirm(`Remove ${label} from ${tournament.name}?`)) return
+    setActionError('')
+    try {
+      await removeParticipant(id, p.id)
+      await load()
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message ?? 'Failed to remove participant')
     }
   }
 
@@ -81,16 +137,36 @@ export default function TournamentDetail() {
     return <div className="page"><div className="container"><p style={{ color: 'var(--color-text-muted)' }}>Loading...</p></div></div>
   }
   if (error || !tournament) {
-    return <div className="page"><div className="container"><p style={{ color: 'var(--color-error)' }}>{error || 'Tournament not found'}</p></div></div>
+    return (
+      <div className="page">
+        <div className="container" style={{ textAlign: 'center', paddingTop: '3rem' }}>
+          <p style={{ color: 'var(--color-error)', marginBottom: '1rem' }}>{error || 'Tournament not found'}</p>
+          <Link to="/tournaments" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>← Back to tournaments</Link>
+        </div>
+      </div>
+    )
   }
 
   const isOrganizer = !!user && user.id === tournament.organizer_id
   const isFull = tournament.current_participants >= tournament.max_participants
-  const canGenerate = isOrganizer && matches.length === 0 && participants.length >= 2
+  const canGenerate = isOrganizer && matches.length === 0 && participants.length >= 2 && tournament.status === 'closed'
+  const canLeave = !isOrganizer && status.is_participant && ['open', 'closed'].includes(tournament.status)
+  const canKick = isOrganizer && ['open', 'closed'].includes(tournament.status)
 
   return (
     <div className="page">
       <div className="container" style={{ maxWidth: 920 }}>
+        {/* Privacy banner */}
+        {!tournament.is_visible && (
+          <div style={{
+            background: '#fef3c7', border: '1px solid #fbbf24', color: '#78350f',
+            borderRadius: 'var(--border-radius)', padding: '0.75rem 1rem',
+            marginBottom: '1rem', fontSize: '0.875rem',
+          }}>
+            🔒 This tournament is private. Only invited participants should have this link.
+          </div>
+        )}
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
           <div>
@@ -120,6 +196,38 @@ export default function TournamentDetail() {
           <Stat label="Visibility" value={tournament.is_visible ? 'Public' : 'Private'} />
         </div>
 
+        {actionError && (
+          <p style={{ color: 'var(--color-error)', fontSize: '0.85rem', marginBottom: '1rem' }}>{actionError}</p>
+        )}
+
+        {/* Organizer controls */}
+        {isOrganizer && tournament.status !== 'finished' && (
+          <div style={cardStyle}>
+            <h2 style={sectionTitle}>Tournament Controls</h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {tournament.status === 'draft' && (
+                <TransitionButton label="Publish" onClick={() => runTransition('publish')} disabled={transitioning} />
+              )}
+              {tournament.status === 'open' && (
+                <TransitionButton label="Close Registration" onClick={() => runTransition('close')} disabled={transitioning} />
+              )}
+              {tournament.status === 'closed' && matches.length > 0 && (
+                <TransitionButton label="Start Tournament" onClick={() => runTransition('start')} disabled={transitioning} primary />
+              )}
+              {canGenerate && (
+                <TransitionButton label={generating ? 'Generating...' : 'Generate Bracket'} onClick={handleGenerate} disabled={generating} primary />
+              )}
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
+              {tournament.status === 'draft' && 'Publish to open registration.'}
+              {tournament.status === 'open' && 'Close registration when you have enough participants.'}
+              {tournament.status === 'closed' && matches.length === 0 && 'Generate the bracket before starting.'}
+              {tournament.status === 'closed' && matches.length > 0 && 'Bracket ready. Start the tournament to lock the roster.'}
+              {tournament.status === 'started' && 'Tournament in progress. Submit match results via the bracket.'}
+            </p>
+          </div>
+        )}
+
         {/* Join section */}
         {user && !isOrganizer && (
           <div style={cardStyle}>
@@ -131,30 +239,60 @@ export default function TournamentDetail() {
               status={tournament.status}
               onJoinSuccess={load}
             />
+            {canLeave && (
+              <button
+                onClick={handleLeave}
+                style={{
+                  marginTop: '0.75rem', background: 'transparent',
+                  color: 'var(--color-error)', border: '1px solid var(--color-error)',
+                  borderRadius: 'var(--border-radius)', padding: '0.4rem 0.85rem',
+                  fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+                }}
+              >
+                Leave Tournament
+              </button>
+            )}
           </div>
         )}
 
         {/* Bracket */}
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={sectionTitle}>Bracket</h2>
-            {canGenerate && (
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                style={{
-                  background: 'var(--color-primary)', color: '#fff', border: 'none',
-                  borderRadius: 'var(--border-radius)', padding: '0.5rem 1rem',
-                  fontWeight: 600, fontSize: '0.8rem',
-                  cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.6 : 1,
-                }}
-              >
-                {generating ? 'Generating...' : 'Generate Bracket'}
-              </button>
-            )}
-          </div>
+          <h2 style={sectionTitle}>Bracket</h2>
           <BracketView matches={matches} />
         </div>
+
+        {/* Standings (round-robin only) */}
+        {tournament.bracket_type === 'round_robin' && (
+          <div style={cardStyle}>
+            <h2 style={sectionTitle}>Standings</h2>
+            {standings.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>No completed matches yet.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ padding: '0.5rem 0' }}>#</th>
+                    <th>Player</th>
+                    <th>W</th>
+                    <th>L</th>
+                    <th>P</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((r, i) => (
+                    <tr key={r.participant_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.4rem 0', color: 'var(--color-text-muted)' }}>{i + 1}</td>
+                      <td>{r.username ?? r.manual_name ?? 'Unknown'}</td>
+                      <td>{r.wins}</td>
+                      <td>{r.losses}</td>
+                      <td>{r.played}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
         {/* Participants */}
         <div style={cardStyle}>
@@ -164,9 +302,21 @@ export default function TournamentDetail() {
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {participants.map((p) => (
-                <li key={p.id} style={{ fontSize: '0.875rem' }}>
-                  {p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'Unknown')}
-                  {p.team_id && <span style={{ color: 'var(--color-text-muted)', marginLeft: '0.5rem', fontSize: '0.75rem' }}>(team)</span>}
+                <li key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <span>{p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'Unknown')}</span>
+                  {p.team_id && <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>(team)</span>}
+                  {canKick && (
+                    <button
+                      onClick={() => handleKick(p)}
+                      style={{
+                        marginLeft: 'auto', background: 'transparent', color: 'var(--color-error)',
+                        border: 'none', padding: '0.25rem 0.5rem', cursor: 'pointer', fontSize: '0.85rem',
+                      }}
+                      title="Remove participant"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -209,5 +359,24 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
       <div style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '0.25rem' }}>{value}</div>
     </div>
+  )
+}
+
+function TransitionButton({ label, onClick, disabled, primary }: { label: string; onClick: () => void; disabled: boolean; primary?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: primary ? 'var(--color-primary)' : 'transparent',
+        color: primary ? '#fff' : 'var(--color-primary)',
+        border: primary ? 'none' : '1px solid var(--color-primary)',
+        borderRadius: 'var(--border-radius)', padding: '0.5rem 1rem',
+        fontWeight: 600, fontSize: '0.85rem',
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {label}
+    </button>
   )
 }

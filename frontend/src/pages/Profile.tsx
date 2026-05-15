@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { updateMe } from '../api/users'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
+
+const MAX_AVATAR_BYTES = 200 * 1024  // 200 KB cap on base64 payload to keep DB row small
 
 export default function Profile() {
   const { user, setAuth, token } = useAuthStore()
@@ -12,6 +14,8 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -44,6 +48,36 @@ export default function Profile() {
     }
   }
 
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    if (file.size > MAX_AVATAR_BYTES) {
+      setError(`Avatar too large (max ${Math.round(MAX_AVATAR_BYTES / 1024)} KB)`)
+      return
+    }
+    setError('')
+    setAvatarUploading(true)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const updated = await updateMe({ avatar_url: dataUrl })
+      if (token && user) {
+        setAuth(token, { ...user, ...updated })
+      }
+      setSuccess('Avatar updated')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? 'Failed to upload avatar')
+    } finally {
+      setAvatarUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   if (!user) {
     return <div className="container">Loading...</div>
   }
@@ -64,23 +98,42 @@ export default function Profile() {
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
+          {user.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt="avatar"
+              style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', margin: '0 auto', display: 'block' }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 80, height: 80, borderRadius: '50%',
+                background: 'var(--color-primary)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: '2rem', margin: '0 auto',
+              }}
+            >
+              {initials}
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={avatarUploading}
             style={{
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: 'var(--color-primary)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '2rem',
-              margin: '0 auto',
+              marginTop: '0.75rem', background: 'none',
+              color: 'var(--color-primary)', border: 'none',
+              fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
             }}
           >
-            {initials}
-          </div>
+            {avatarUploading ? 'Uploading...' : (user.avatar_url ? 'Change avatar' : 'Upload avatar')}
+          </button>
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>

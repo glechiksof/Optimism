@@ -75,3 +75,18 @@ export async function getHostedTournaments(): Promise<Tournament[]> {
 export async function deleteTournament(id: string): Promise<void> {
   await client.delete(`/tournaments/${id}`)
 }
+
+export async function publishTournament(id: string): Promise<Tournament> {
+  const res = await client.post<Tournament>(`/tournaments/${id}/publish`)
+  return res.data
+}
+
+export async function closeTournament(id: string): Promise<Tournament> {
+  const res = await client.post<Tournament>(`/tournaments/${id}/close`)
+  return res.data
+}
+
+export async function startTournament(id: string): Promise<Tournament> {
+  const res = await client.post<Tournament>(`/tournaments/${id}/start`)
+  return res.data
+}

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { listTournaments, type Tournament } from '../api/tournaments'
-import { getParticipationStatus } from '../api/participation'
+import { Link } from 'react-router-dom'
+import { getJoinedTournaments } from '../api/participation'
+import type { Tournament } from '../api/tournaments'
 import TournamentCard from '../components/TournamentCard'
 
-const ONGOING_STATUSES = new Set(['open', 'published', 'closed', 'started'])
+const ONGOING_STATUSES = new Set(['open', 'closed', 'started'])
 
 export default function OngoingTournaments() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -14,14 +15,9 @@ export default function OngoingTournaments() {
     async function load() {
       setLoading(true)
       try {
-        const res = await listTournaments({ page_size: 100 })
-        const ongoing = res.items.filter((t) => ONGOING_STATUSES.has(t.status))
-        // Filter to ones the current user is registered for.
-        const statuses = await Promise.all(
-          ongoing.map((t) => getParticipationStatus(t.id).catch(() => ({ is_participant: false, participant_id: null }))),
-        )
-        const mine = ongoing.filter((_, i) => statuses[i].is_participant)
-        if (!cancelled) setTournaments(mine)
+        const all = await getJoinedTournaments()
+        const ongoing = all.filter((t) => ONGOING_STATUSES.has(t.status))
+        if (!cancelled) setTournaments(ongoing)
       } catch {
         if (!cancelled) setTournaments([])
       } finally {
@@ -42,6 +38,9 @@ export default function OngoingTournaments() {
         ) : tournaments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--color-text-muted)' }}>
             <p>You are not registered in any active tournaments.</p>
+            <Link to="/tournaments" style={{ color: 'var(--color-primary)', fontWeight: 600, marginTop: '0.75rem', display: 'inline-block' }}>
+              Browse tournaments →
+            </Link>
           </div>
         ) : (
           <div style={{

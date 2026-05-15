@@ -45,6 +45,8 @@ export interface JoinToken {
   id: string
   token: string
   expires_at: string
+  used_at?: string | null
+  is_active: boolean
 }
 
 export async function createTeam(data: CreateTeamData): Promise<Team> {
@@ -84,4 +86,16 @@ export async function generateToken(id: string): Promise<JoinToken> {
 export async function getTokens(id: string): Promise<JoinToken[]> {
   const res = await client.get<JoinToken[]>(`/teams/${id}/tokens`)
   return res.data
+}
+
+export async function revokeToken(teamId: string, tokenId: string): Promise<void> {
+  await client.delete(`/teams/${teamId}/tokens/${tokenId}`)
+}
+
+export async function leaveTeam(id: string): Promise<void> {
+  await client.delete(`/teams/${id}/leave`)
+}
+
+export async function removeMember(teamId: string, memberId: string): Promise<void> {
+  await client.delete(`/teams/${teamId}/members/${memberId}`)
 }
