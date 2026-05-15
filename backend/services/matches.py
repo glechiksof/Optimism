@@ -408,6 +408,23 @@ def submit_result(
                 target.participant_a_id = winner_participant_id
             else:
                 target.participant_b_id = winner_participant_id
+    else:
+        # Fallback for matches generated before feeder columns existed.
+        # Compute target by (match_number + 1) // 2 in next round and fill first NULL slot.
+        target = (
+            db.query(Match)
+            .filter(
+                Match.tournament_id == tournament_id,
+                Match.round_number == match.round_number + 1,
+                Match.match_number == (match.match_number + 1) // 2,
+            )
+            .first()
+        )
+        if target:
+            if target.participant_a_id is None:
+                target.participant_a_id = winner_participant_id
+            elif target.participant_b_id is None:
+                target.participant_b_id = winner_participant_id
 
     _maybe_finish_tournament(tournament_id, db)
     db.commit()
