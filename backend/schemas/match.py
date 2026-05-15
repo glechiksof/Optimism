@@ -34,3 +34,16 @@ class MatchListResponse(BaseModel):
 
 class SubmitResultRequest(BaseModel):
     winner_participant_id: UUID
+
+
+class StandingsRow(BaseModel):
+    participant_id: UUID
+    username: Optional[str] = None
+    manual_name: Optional[str] = None
+    wins: int
+    losses: int
+    played: int
+
+
+class StandingsResponse(BaseModel):
+    items: list[StandingsRow]

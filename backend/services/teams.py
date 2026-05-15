@@ -1,13 +1,15 @@
 from uuid import UUID
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 
 from models.team import Team
 from models.membership import TeamMember
 from schemas.team import TeamCreate, TeamUpdate
 from exceptions import AppError
-from services.join_tokens import validate_token
+from services.join_tokens import validate_token, mark_token_used
 
 
 def _count_members(team_id: UUID, db: Session) -> int:
@@ -43,6 +45,14 @@ def create_team(data: TeamCreate, creator_id: UUID, db: Session) -> Team:
 
 def get_team_or_404(team_id: UUID, db: Session) -> Team:
     team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise AppError(404, "Team not found")
+    return team
+
+
+def _get_team_for_update(team_id: UUID, db: Session) -> Team:
+    """Lock team row for serialized join/leave to prevent capacity oversell."""
+    team = db.query(Team).filter(Team.id == team_id).with_for_update().first()
     if not team:
         raise AppError(404, "Team not found")
     return team
@@ -89,36 +99,69 @@ def delete_team(team_id: UUID, creator_id: UUID, db: Session) -> None:
 
 def join_team(team_id: UUID, user_id: UUID, token_str: str | None, db: Session) -> TeamMember:
     """Join team based on join_method. Capacity is real-time checked via _count_members."""
-    team = get_team_or_404(team_id, db)
+    team = _get_team_for_update(team_id, db)
+    validated_token = None
 
-    # Check join_method first
+    # Method gate
     if team.join_method == "manual":
         raise AppError(403, "Join is by manual invitation only")
     elif team.join_method == "link":
         if not token_str:
             raise AppError(400, "Token required for link join")
-        validate_token(token_str, team_id, db)
+        validated_token = validate_token(token_str, team_id, db)
     elif team.join_method == "mixed":
         if token_str:
-            validate_token(token_str, team_id, db)
+            validated_token = validate_token(token_str, team_id, db)
     # team_page: no token required
 
-    # Duplicate check before capacity (cheaper, short-circuits early)
-    existing = db.query(TeamMember).filter(
-        and_(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
-    ).first()
-    if existing:
-        raise AppError(409, "Already a member of this team")
-
-    # Capacity check (real-time count, not stale current_size)
-    # Note: not protected against race conditions under high concurrency
+    # Capacity check (real-time count)
     member_count = _count_members(team_id, db)
     if member_count >= team.capacity:
         raise AppError(422, "Team is full")
 
     member = TeamMember(team_id=team_id, user_id=user_id)
     db.add(member)
-    team.current_size += 1
-    db.commit()
+    team.current_size = member_count + 1
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise AppError(409, "Already a member of this team")
+    if validated_token is not None:
+        mark_token_used(validated_token.id, user_id, db)
     db.refresh(member)
     return member
+
+
+def leave_team(team_id: UUID, user_id: UUID, db: Session) -> None:
+    """Allow a member to leave a team. Creator cannot leave their own team — must delete it."""
+    team = _get_team_for_update(team_id, db)
+    if team.created_by == user_id:
+        raise AppError(422, "Team creator cannot leave; delete the team instead")
+    member = db.query(TeamMember).filter(
+        and_(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
+    ).first()
+    if not member:
+        raise AppError(404, "You are not a member of this team")
+    db.delete(member)
+    if team.current_size > 0:
+        team.current_size -= 1
+    db.commit()
+
+
+def remove_member(team_id: UUID, member_id: UUID, creator_id: UUID, db: Session) -> None:
+    """Creator-only removal of a team member."""
+    team = _get_team_for_update(team_id, db)
+    if team.created_by != creator_id:
+        raise AppError(403, "Only the team creator can remove members")
+    member = db.query(TeamMember).filter(
+        and_(TeamMember.id == member_id, TeamMember.team_id == team_id)
+    ).first()
+    if not member:
+        raise AppError(404, "Member not found")
+    if member.user_id == creator_id:
+        raise AppError(422, "Creator cannot be removed from their own team")
+    db.delete(member)
+    if team.current_size > 0:
+        team.current_size -= 1
+    db.commit()

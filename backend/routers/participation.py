@@ -11,7 +11,15 @@ from schemas.participation import (
     ParticipantListResponse,
     ParticipationStatusResponse,
 )
-from services.participation import join_tournament, get_participants, get_status
+from schemas.tournament import TournamentResponse
+from services.participation import (
+    join_tournament,
+    leave_tournament,
+    remove_participant,
+    get_participants,
+    get_status,
+    get_joined_tournaments,
+)
 
 
 router = APIRouter()
@@ -31,6 +39,35 @@ def join_tournament_endpoint(
     """Register the current user for a tournament (optionally as a team)."""
     participant = join_tournament(tournament_id, current_user.id, data.team_id, db)
     return participant
+
+
+@router.delete(
+    "/tournaments/{tournament_id}/leave",
+    status_code=204,
+)
+def leave_tournament_endpoint(
+    tournament_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancel current user's registration. Allowed only while tournament is open or closed."""
+    leave_tournament(tournament_id, current_user.id, db)
+    return None
+
+
+@router.delete(
+    "/tournaments/{tournament_id}/participants/{participant_id}",
+    status_code=204,
+)
+def remove_participant_endpoint(
+    tournament_id: UUID,
+    participant_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Organizer-only removal of a specific participant."""
+    remove_participant(tournament_id, participant_id, current_user.id, db)
+    return None
 
 
 @router.get(
@@ -57,3 +94,18 @@ def participation_status_endpoint(
 ):
     """Return whether current user is registered for tournament."""
     return get_status(tournament_id, current_user.id, db)
+
+
+@router.get(
+    "/users/me/joined-tournaments",
+    response_model=list[TournamentResponse],
+)
+def list_joined_tournaments_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all tournaments the current user is registered for.
+
+    Lives under /users/me/* to avoid collision with /tournaments/{id} parametric route.
+    """
+    return get_joined_tournaments(current_user.id, db)
