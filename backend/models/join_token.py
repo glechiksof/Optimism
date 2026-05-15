@@ -15,6 +15,10 @@ class JoinToken(Base):
     token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean(), server_default="true", nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(), nullable=True)
+    used_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(), server_default=func.now())
 
     team: Mapped["Team"] = relationship(back_populates="join_tokens")

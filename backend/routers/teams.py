@@ -18,14 +18,18 @@ from services.teams import (
     update_team,
     delete_team,
     join_team,
+    leave_team,
+    remove_member,
 )
-from services.join_tokens import create_token
+from services.join_tokens import create_token, revoke_token
 
 
 class JoinTokenResponse(BaseModel):
     id: UUID
     token: str
     expires_at: datetime
+    used_at: datetime | None = None
+    is_active: bool
 
     class Config:
         from_attributes = True
@@ -33,6 +37,7 @@ class JoinTokenResponse(BaseModel):
 
 class JoinRequest(BaseModel):
     token: str | None = None
+
 
 router = APIRouter()
 
@@ -101,13 +106,36 @@ def join_team_endpoint(
     return member
 
 
+@router.delete("/teams/{team_id}/leave", status_code=204)
+def leave_team_endpoint(
+    team_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Leave a team you are a member of. Creator cannot leave."""
+    leave_team(team_id, current_user.id, db)
+    return None
+
+
+@router.delete("/teams/{team_id}/members/{member_id}", status_code=204)
+def remove_member_endpoint(
+    team_id: UUID,
+    member_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Creator-only removal of a team member."""
+    remove_member(team_id, member_id, current_user.id, db)
+    return None
+
+
 @router.post("/teams/{team_id}/tokens", response_model=JoinTokenResponse, status_code=201)
 def create_join_token_endpoint(
     team_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create join token (owner only)."""
+    """Create single-use join token (owner only)."""
     team = get_team_or_404(team_id, db)
     if team.created_by != current_user.id:
         raise AppError(403, "Only team creator can create tokens")
@@ -121,11 +149,26 @@ def list_join_tokens_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List active join tokens (owner only)."""
+    """List join tokens (owner only)."""
     team = get_team_or_404(team_id, db)
     if team.created_by != current_user.id:
         raise AppError(403, "Only team creator can list tokens")
-    tokens = db.query(JoinToken).filter(
-        (JoinToken.team_id == team_id) & (JoinToken.is_active == True)
+    tokens = db.query(JoinToken).filter(JoinToken.team_id == team_id).order_by(
+        JoinToken.created_at.desc()
     ).all()
     return tokens
+
+
+@router.delete("/teams/{team_id}/tokens/{token_id}", status_code=204)
+def revoke_token_endpoint(
+    team_id: UUID,
+    token_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Soft-revoke a join token (owner only)."""
+    team = get_team_or_404(team_id, db)
+    if team.created_by != current_user.id:
+        raise AppError(403, "Only team creator can revoke tokens")
+    revoke_token(token_id, team_id, db)
+    return None
