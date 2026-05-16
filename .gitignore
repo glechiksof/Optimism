@@ -59,6 +59,7 @@ venv.bak/
 # Pytest / Coverage
 .pytest_cache/
 .coverage
+coverage/
 .coverage.*
 htmlcov/
 coverage.xml
@@ -105,6 +106,10 @@ lib64/
 *.p12
 *.pfx
 secrets.json
+
+# ─── Playwright ──────────────────────────────────────────────────────────────────
+playwright-report/
+test-results/
 
 # ─── Miscellaneous ───────────────────────────────────────────────────────────────
 claude.md
