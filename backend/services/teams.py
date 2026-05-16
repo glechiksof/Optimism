@@ -58,13 +58,40 @@ def _get_team_for_update(team_id: UUID, db: Session) -> Team:
     return team
 
 
-def list_teams(tournament_id: UUID | None, visible_only: bool, db: Session) -> list[Team]:
-    """List teams with optional tournament filter and visibility filter."""
+def list_teams(
+    tournament_id: UUID | None,
+    visible_only: bool,
+    db: Session,
+    requester_id: UUID | None = None,
+) -> list[Team]:
+    """List teams. Private teams returned only when requester is creator
+    or a member; visible_only=False is honored only for that subset."""
     query = db.query(Team)
     if tournament_id:
         query = query.filter(Team.tournament_id == tournament_id)
+
     if visible_only:
         query = query.filter(Team.is_visible == True)
+        return query.order_by(Team.created_at.desc()).all()
+
+    # visible_only=False — include privates only for the requesting user
+    if requester_id is None:
+        # Anon caller cannot see private teams regardless of flag
+        query = query.filter(Team.is_visible == True)
+        return query.order_by(Team.created_at.desc()).all()
+
+    from models.membership import TeamMember
+    member_team_ids_subq = (
+        db.query(TeamMember.team_id).filter(TeamMember.user_id == requester_id).subquery()
+    )
+    from sqlalchemy import or_
+    query = query.filter(
+        or_(
+            Team.is_visible == True,
+            Team.created_by == requester_id,
+            Team.id.in_(member_team_ids_subq),
+        )
+    )
     return query.order_by(Team.created_at.desc()).all()
 
 
