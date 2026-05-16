@@ -264,7 +264,11 @@ def _resolve_chained_byes(matches: list[Match], db: Session) -> None:
 def generate_round_robin(tournament_id: UUID, db: Session) -> list[Match]:
     """Build a round-robin bracket using Berger tables (circle method).
     Each player meets each other once; total = n*(n-1)/2 matches.
-    Matches are grouped into rounds so each player plays at most once per round."""
+    Matches are grouped into rounds so each player plays at most once per round.
+
+    For odd n we pad with a literal `None` slot (the "bye"). Pairs that include
+    the None slot are simply skipped — no phantom TBD matches are written.
+    """
     get_tournament(tournament_id, db)
 
     existing = db.query(Match).filter(Match.tournament_id == tournament_id).first()
@@ -281,27 +285,27 @@ def generate_round_robin(tournament_id: UUID, db: Session) -> list[Match]:
         raise AppError(422, "Need at least 2 participants to generate matches")
 
     random.shuffle(participants)
-    # Berger requires even count; add a "bye" sentinel for odd n.
-    bye_marker: TournamentParticipant | None = None
-    if n % 2 == 1:
-        # Sentinel with None id; matches against bye_marker are skipped.
-        bye_marker = TournamentParticipant(tournament_id=tournament_id, user_id=None, team_id=None)
-        participants.append(bye_marker)
 
-    k = len(participants)
+    # Pad odd n with a literal None placeholder. Cleaner than a sentinel object;
+    # the if-check below is type-clear rather than relying on `is` identity.
+    padded: list[TournamentParticipant | None] = list(participants)
+    if n % 2 == 1:
+        padded.append(None)
+
+    k = len(padded)
     rounds = k - 1
     half = k // 2
 
     matches: list[Match] = []
-    # Fix participant 0, rotate the rest.
+    # Fix index 0, rotate the rest each round.
     order = list(range(k))
     for r in range(rounds):
         match_number = 1
         for i in range(half):
-            a = participants[order[i]]
-            b = participants[order[k - 1 - i]]
-            if bye_marker is not None and (a is bye_marker or b is bye_marker):
-                continue  # skip bye sentinel pair
+            a = padded[order[i]]
+            b = padded[order[k - 1 - i]]
+            if a is None or b is None:
+                continue  # bye for whoever was paired with the None slot
             matches.append(Match(
                 tournament_id=tournament_id,
                 round_number=r + 1,
