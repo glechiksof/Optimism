@@ -31,12 +31,23 @@ class TournamentCreate(BaseModel):
             raise ValueError("max_participants must be at least 2")
         return v
 
+    @field_validator("start_date")
+    @classmethod
+    def validate_start_in_future(cls, v: datetime) -> datetime:
+        # Reject past start dates so users can't accidentally schedule a
+        # tournament that has already started. Compare as naive UTC since
+        # both sides are tz-naive here.
+        now = datetime.utcnow()
+        if v <= now:
+            raise ValueError("Start date must be in the future")
+        return v
+
     @field_validator("end_date")
     @classmethod
     def validate_end_after_start(cls, v: datetime, info) -> datetime:
         start = info.data.get("start_date")
         if start and v <= start:
-            raise ValueError("end_date must be after start_date")
+            raise ValueError("End date must be after start date")
         return v
 
 
