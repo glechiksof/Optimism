@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 
+const base = import.meta.env.BASE_URL
+
 export default function Home() {
   return (
     <div className="home-layout">
-      <aside className="home-layout__left" style={styles.leftPanel}>
+      <aside className="home-layout__left" style={{ ...styles.leftPanel, backgroundImage: `url(${base}bg-left.png)` }}>
         <div style={styles.leftStack}>
-          <img src="/title+logo.png" alt="Tournament Organizer" style={styles.titleLogo} />
-          <img src="/banana.png" alt="" style={styles.banana} />
+          <img src={`${base}title+logo.png`} alt="Tournament Organizer" style={styles.titleLogo} />
+          <img src={`${base}banana.png`} alt="" style={styles.banana} />
         </div>
       </aside>
 
@@ -29,7 +31,7 @@ export default function Home() {
 const styles: Record<string, React.CSSProperties> = {
   leftPanel: {
     backgroundColor: '#4287f5',
-    backgroundImage: 'url(/bg-left.png)',
+    backgroundImage: '',
     backgroundSize: 'cover',
     backgroundPosition: 'center bottom',
     backgroundRepeat: 'no-repeat',
