@@ -32,6 +32,7 @@ export default function CreateTournament() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [isVisible, setIsVisible] = useState(true)
+  const [isTeamBased, setIsTeamBased] = useState(false)
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [apiError, setApiError] = useState('')
@@ -68,6 +69,7 @@ export default function CreateTournament() {
         start_date: new Date(startDate).toISOString(),
         end_date: new Date(endDate).toISOString(),
         is_visible: status === 'draft' ? false : isVisible,
+        is_team_based: isTeamBased,
       })
       if (status === 'open') {
         await publishTournament(created.id)
@@ -162,6 +164,17 @@ export default function CreateTournament() {
               style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
             Visible to everyone (uncheck to make private)
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+            <input
+              type="checkbox"
+              checked={isTeamBased}
+              onChange={(e) => setIsTeamBased(e.target.checked)}
+              disabled={loading}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
+            Team-based tournament (organizer adds teams; individual players cannot register)
           </label>
 
           <FormError message={apiError} />

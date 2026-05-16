@@ -12,6 +12,7 @@ import {
   mockGenerateToken, mockGetTokens, mockRevokeToken,
   mockJoinedTournaments, mockMyStats, mockStandings,
   mockUpdateTeam, mockDeleteTeam, mockDeleteTournament, mockSubmitMatchResult,
+  mockAddTeamToTournament,
 } from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
@@ -81,7 +82,8 @@ if (USE_MOCK) {
 
     if (method === 'get' && url === '/tournaments') {
       const search = config.params?.search
-      return mockListTournaments(search).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+      const type = config.params?.type
+      return mockListTournaments(search, type).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
     if (method === 'get' && url.match(/^\/tournaments\/[^/]+$/)) {
@@ -110,6 +112,11 @@ if (USE_MOCK) {
     if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/join$/)) {
       const id = url.split('/')[2]
       return mockJoinTournament(token, id, body).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+    }
+
+    if (method === 'post' && url.match(/^\/tournaments\/[^/]+\/teams$/)) {
+      const id = url.split('/')[2]
+      return mockAddTeamToTournament(token, id, body.team_id).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
     }
 
     if (method === 'get' && url.match(/^\/tournaments\/[^/]+\/participants$/)) {

@@ -18,6 +18,7 @@ export default function Tournaments() {
   const [tab, setTab] = useState<Tab>(initialTab)
 
   const [query, setQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'solo' | 'team'>('all')
   const [results, setResults] = useState<Tournament[]>([])
   const [total, setTotal] = useState(0)
   const [loadingSearch, setLoadingSearch] = useState(false)
@@ -41,7 +42,10 @@ export default function Tournaments() {
     debounceRef.current = setTimeout(async () => {
       setLoadingSearch(true)
       try {
-        const res = await listTournaments({ search: query || undefined })
+        const res = await listTournaments({
+          search: query || undefined,
+          type: typeFilter === 'all' ? undefined : typeFilter,
+        })
         setResults(res.items)
         setTotal(res.total)
       } catch {
@@ -52,7 +56,7 @@ export default function Tournaments() {
       }
     }, 300)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [query, tab])
+  }, [query, tab, typeFilter])
 
   useEffect(() => {
     if (tab !== 'hosted') return
@@ -109,12 +113,30 @@ export default function Tournaments() {
 
         {tab === 'search' && (
           <>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <SearchBar
-                value={query}
-                onChange={setQuery}
-                placeholder="Search tournaments..."
-              />
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <SearchBar
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search tournaments..."
+                />
+              </div>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as 'all' | 'solo' | 'team')}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--border-radius)',
+                  fontSize: '0.9rem',
+                  background: 'var(--color-bg)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All formats</option>
+                <option value="solo">Solo</option>
+                <option value="team">Team</option>
+              </select>
             </div>
 
             {loadingSearch ? (
