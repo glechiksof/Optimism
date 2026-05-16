@@ -16,7 +16,7 @@ export default function Navbar() {
     <nav style={styles.nav}>
       <div style={styles.inner}>
         <Link to="/" style={styles.brand}>
-          <img src="/teambracket-icon.png" alt="Tournament Organizer" style={styles.logo} />
+          <img src={`${import.meta.env.BASE_URL}teambracket-icon.png`} alt="Tournament Organizer" style={styles.logo} />
           <span style={styles.brandText}>Tournament Organizer</span>
         </Link>
 
