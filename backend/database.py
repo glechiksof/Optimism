@@ -3,7 +3,9 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from config import settings
 
-engine = create_engine(settings.DATABASE_URL)
+# Render provides postgresql:// URLs; SQLAlchemy needs psycopg (v3) dialect marker.
+_db_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+engine = create_engine(_db_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=True, bind=engine)
 
 
