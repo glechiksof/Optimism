@@ -45,7 +45,11 @@ export default function CreateTournament() {
     if (!sportType.trim()) e.sport_type = 'Sport type is required'
     const max = parseInt(maxParticipants)
     if (!maxParticipants || isNaN(max) || max < 2) e.max_participants = 'Must be at least 2'
-    if (!startDate) e.start_date = 'Start date is required'
+    if (!startDate) {
+      e.start_date = 'Start date is required'
+    } else if (new Date(startDate) <= new Date()) {
+      e.start_date = 'Start date must be in the future'
+    }
     if (!endDate) e.end_date = 'End date is required'
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
       e.end_date = 'End date must be after start date'
