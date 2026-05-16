@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import Toast from '../components/ui/Toast'
 import { createTournament, publishTournament } from '../api/tournaments'
+import { getErrorMessage } from '../utils/errors'
 
 const BRACKET_OPTIONS = [
   { value: 'single_elim', label: 'Single Elimination' },
@@ -76,9 +77,8 @@ export default function CreateTournament() {
         variant: 'success',
       })
       setTimeout(() => navigate('/tournaments?tab=hosted'), 1200)
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.response?.data?.message || 'Failed to save tournament'
-      setApiError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } catch (err: unknown) {
+      setApiError(getErrorMessage(err, 'Failed to save tournament'))
     } finally {
       setLoading(false)
     }

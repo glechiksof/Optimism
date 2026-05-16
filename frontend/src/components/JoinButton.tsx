@@ -3,6 +3,7 @@ import Button from './ui/Button'
 import Input from './ui/Input'
 import FormError from './ui/FormError'
 import { joinTeam } from '../api/teams'
+import { getErrorMessage } from '../utils/errors'
 
 interface JoinButtonProps {
   teamId: string
@@ -39,9 +40,8 @@ export default function JoinButton({ teamId, joinMethod, isFull, isMember, onJoi
     try {
       await joinTeam(teamId, tokenVal)
       onJoinSuccess()
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.detail || 'Failed to join team'
-      setError(typeof msg === 'string' ? msg : 'Failed to join team')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to join team'))
     } finally {
       setLoading(false)
     }

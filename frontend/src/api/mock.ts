@@ -843,16 +843,138 @@ export async function mockMyStats(token: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Mutators missing from earlier mock-adapter passes
+// ---------------------------------------------------------------------------
+export async function mockUpdateTeam(token: string, id: string, data: { name?: string; capacity?: number; join_method?: string; is_visible?: boolean }) {
+  return new Promise<Team>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const all = getMockTeams()
+      const idx = all.findIndex((t) => t.id === id)
+      if (idx === -1) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
+      const team = all[idx]
+      if (team.created_by !== userId) { reject({ response: { data: { message: 'Only team creator can update' }, status: 403 } }); return }
+      if (data.capacity !== undefined && data.capacity < team.members.length) {
+        reject({ response: { data: { message: `Cannot reduce capacity to ${data.capacity}: team has ${team.members.length} members` }, status: 422 } }); return
+      }
+      Object.assign(team, data)
+      saveMockTeams(all)
+      resolve(team)
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockDeleteTeam(token: string, id: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const all = getMockTeams()
+      const idx = all.findIndex((t) => t.id === id)
+      if (idx === -1) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
+      if (all[idx].created_by !== userId) { reject({ response: { data: { message: 'Only team creator can delete' }, status: 403 } }); return }
+      all.splice(idx, 1)
+      saveMockTeams(all)
+      // Cascade clean local stores
+      saveMockTokens(getMockTokens().filter((t) => t.team_id !== id))
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockDeleteTournament(token: string, id: string) {
+  return new Promise<void>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const all = getMockTournaments()
+      const idx = all.findIndex((t) => t.id === id)
+      if (idx === -1) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      const t = all[idx]
+      if (t.organizer_id !== userId) { reject({ response: { data: { message: 'Not the organizer' }, status: 403 } }); return }
+      if (['started', 'finished'].includes(t.status)) {
+        reject({ response: { data: { message: 'Cannot delete a tournament that has started' }, status: 422 } }); return
+      }
+      all.splice(idx, 1)
+      saveMockTournaments(all)
+      // Cascade: drop participants + matches tied to this tournament
+      saveMockParticipants(getMockParticipants().filter((p) => p.tournament_id !== id))
+      saveMockMatches(getMockMatches().filter((m) => m.tournament_id !== id))
+      resolve()
+    }, MOCK_DELAY)
+  })
+}
+
+export async function mockSubmitMatchResult(token: string, tournamentId: string, matchId: string, winnerParticipantId: string) {
+  return new Promise<MockMatch>((resolve, reject) => {
+    setTimeout(() => {
+      const userId = getUserIdFromToken(token)
+      const tournament = getMockTournaments().find((t) => t.id === tournamentId)
+      if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      if (tournament.organizer_id !== userId) { reject({ response: { data: { message: 'Only the organizer can perform this action' }, status: 403 } }); return }
+      const allMatches = getMockMatches()
+      const m = allMatches.find((x) => x.id === matchId && x.tournament_id === tournamentId)
+      if (!m) { reject({ response: { data: { message: 'Match not found' }, status: 404 } }); return }
+      if (m.status === 'completed') { reject({ response: { data: { message: 'Match already completed' }, status: 409 } }); return }
+      const validIds = [m.participant_a?.id, m.participant_b?.id].filter(Boolean)
+      if (!validIds.includes(winnerParticipantId)) {
+        reject({ response: { data: { message: 'Winner must be a participant of this match' }, status: 422 } }); return
+      }
+      m.winner_id = winnerParticipantId
+      m.status = 'completed'
+
+      // Advance via formula: target round R+1 match number = (m.match_number + 1) // 2.
+      const target = allMatches.find((x) =>
+        x.tournament_id === tournamentId &&
+        x.round_number === m.round_number + 1 &&
+        x.match_number === Math.floor((m.match_number + 1) / 2),
+      )
+      if (target) {
+        const winnerInfo = m.participant_a?.id === winnerParticipantId ? m.participant_a : m.participant_b
+        if (!target.participant_a) target.participant_a = winnerInfo!
+        else if (!target.participant_b) target.participant_b = winnerInfo!
+      }
+
+      // Auto-finish: if no pending matches remain, transition tournament.
+      const stillPending = allMatches.some((x) => x.tournament_id === tournamentId && x.status !== 'completed')
+      if (!stillPending) {
+        const tIdx = getMockTournaments().findIndex((t) => t.id === tournamentId)
+        if (tIdx !== -1) {
+          const ts = getMockTournaments()
+          ts[tIdx].status = 'finished'
+          saveMockTournaments(ts)
+        }
+      }
+
+      saveMockMatches(allMatches)
+      resolve(m)
+    }, MOCK_DELAY)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Standings (round-robin)
 // ---------------------------------------------------------------------------
+interface MockStandingsRow {
+  participant_id: string
+  username?: string
+  manual_name?: string
+  wins: number
+  losses: number
+  played: number
+}
+
 export async function mockStandings(tournamentId: string) {
-  return new Promise<{ items: any[] }>((resolve) => {
+  return new Promise<{ items: MockStandingsRow[] }>((resolve) => {
     setTimeout(() => {
       const matches = getMockMatches().filter((m) => m.tournament_id === tournamentId && m.status === 'completed')
-      const stats: Record<string, any> = {}
+      const stats: Record<string, MockStandingsRow> = {}
       for (const p of getMockParticipants().filter((p) => p.tournament_id === tournamentId)) {
         const user = getMockUsers().find((u) => u.id === p.user_id)
-        stats[p.id] = { participant_id: p.id, username: user?.username, manual_name: p.manual_name, wins: 0, losses: 0, played: 0 }
+        stats[p.id] = {
+          participant_id: p.id,
+          username: user?.username,
+          manual_name: p.manual_name,
+          wins: 0, losses: 0, played: 0,
+        }
       }
       for (const m of matches) {
         if (!m.winner_id) continue

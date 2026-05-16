@@ -6,6 +6,7 @@ import CapacityBar from '../components/CapacityBar'
 import JoinButton from '../components/JoinButton'
 import TeamTokenManager from '../components/TeamTokenManager'
 import Toast from '../components/ui/Toast'
+import { getErrorMessage } from '../utils/errors'
 
 const JOIN_METHOD_LABELS: Record<string, string> = {
   team_page: 'Open',
@@ -34,6 +35,8 @@ export default function TeamPage() {
       .finally(() => setLoading(false))
   }
 
+  // load is locally scoped + only reads `id` — safe to depend on id alone
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
 
   async function handleLeave() {
@@ -44,8 +47,8 @@ export default function TeamPage() {
       await leaveTeam(team.id)
       load()
       setToast({ message: 'You left the team', variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? 'Failed to leave team')
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, 'Failed to leave team'))
     }
   }
 
@@ -57,8 +60,8 @@ export default function TeamPage() {
       await removeMember(team.id, memberId)
       load()
       setToast({ message: 'Member removed', variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? 'Failed to remove member')
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, 'Failed to remove member'))
     }
   }
 

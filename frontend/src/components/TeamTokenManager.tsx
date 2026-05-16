@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { generateToken, getTokens, revokeToken, type JoinToken } from '../api/teams'
+import { getErrorMessage } from '../utils/errors'
 
 interface Props {
   teamId: string
@@ -18,13 +19,15 @@ export default function TeamTokenManager({ teamId }: Props) {
     try {
       const rows = await getTokens(teamId)
       setTokens(rows)
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to load tokens')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to load tokens'))
     } finally {
       setLoading(false)
     }
   }
 
+  // load is component-local; depend on teamId only.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [teamId])
 
   async function handleGenerate() {
@@ -32,8 +35,8 @@ export default function TeamTokenManager({ teamId }: Props) {
     try {
       await generateToken(teamId)
       await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to generate token')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to generate token'))
     } finally {
       setGenerating(false)
     }
@@ -43,8 +46,8 @@ export default function TeamTokenManager({ teamId }: Props) {
     try {
       await revokeToken(teamId, tokenId)
       await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to revoke token')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to revoke token'))
     }
   }
 

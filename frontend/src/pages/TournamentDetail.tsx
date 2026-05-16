@@ -15,6 +15,7 @@ import { useAuthStore } from '../store/authStore'
 import JoinTournamentButton from '../components/JoinTournamentButton'
 import BracketView from '../components/BracketView'
 import Toast from '../components/ui/Toast'
+import { getErrorMessage } from '../utils/errors'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -87,6 +88,8 @@ export default function TournamentDetail() {
     }
   }
 
+  // load is locally scoped + only reads id+user.id — disabling exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id, user?.id])
 
   async function handleGenerate() {
@@ -97,8 +100,8 @@ export default function TournamentDetail() {
       await generateMatches(id)
       await load()
       setToast({ message: 'Bracket generated', variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? 'Failed to generate matches')
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, 'Failed to generate matches'))
     } finally {
       setGenerating(false)
     }
@@ -114,8 +117,8 @@ export default function TournamentDetail() {
       await load()
       const labels = { publish: 'Tournament published', close: 'Registration closed', start: 'Tournament started' }
       setToast({ message: labels[action], variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? `Failed to ${action} tournament`)
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, `Failed to ${action} tournament`))
     } finally {
       setTransitioning(false)
     }
@@ -129,8 +132,8 @@ export default function TournamentDetail() {
       await leaveTournament(id)
       await load()
       setToast({ message: 'You left the tournament', variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? 'Failed to leave tournament')
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, 'Failed to leave tournament'))
     }
   }
 
@@ -143,8 +146,8 @@ export default function TournamentDetail() {
       await removeParticipant(id, p.id)
       await load()
       setToast({ message: 'Participant removed', variant: 'success' })
-    } catch (e: any) {
-      setActionError(e?.response?.data?.message ?? 'Failed to remove participant')
+    } catch (e: unknown) {
+      setActionError(getErrorMessage(e, 'Failed to remove participant'))
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { submitMatchResult, type Match, type MatchParticipantInfo } from '../api/matches'
+import { getErrorMessage } from '../utils/errors'
 
 interface Props {
   match: Match
@@ -30,8 +31,8 @@ export default function MatchCard({ match, tournamentId, canPickWinner, onResult
     try {
       await submitMatchResult(tournamentId, match.id, participantId)
       onResult?.()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to submit result')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to submit result'))
     } finally {
       setSubmitting(null)
     }

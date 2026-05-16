@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import { register } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
+import { getErrorMessage } from '../utils/errors'
 
 export default function SignUp() {
   const [username, setUsername] = useState('')
@@ -40,8 +41,8 @@ export default function SignUp() {
       const res = await register({ email, username, password })
       setAuth(res.access_token, res.user)
       navigate('/')
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Registration failed'))
     } finally {
       setLoading(false)
     }
