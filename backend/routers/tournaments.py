@@ -46,9 +46,15 @@ def search(
     search: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    type: str | None = Query(default=None, description="'solo' | 'team' | None for all"),
     db: Session = Depends(get_db),
 ):
-    items, total = list_tournaments(db, search=search, page=page, page_size=page_size)
+    if type is not None and type not in {"solo", "team"}:
+        from exceptions import AppError
+        raise AppError(422, "type must be 'solo' or 'team'")
+    items, total = list_tournaments(
+        db, search=search, page=page, page_size=page_size, type_filter=type,
+    )
     return TournamentListResponse(items=items, total=total, page=page, page_size=page_size)
 
 

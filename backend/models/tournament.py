@@ -22,6 +22,7 @@ class Tournament(Base):
     end_date: Mapped[datetime] = mapped_column(TIMESTAMP(), nullable=False)
     status: Mapped[str] = mapped_column(String(50), server_default="draft", nullable=False)
     is_visible: Mapped[bool] = mapped_column(Boolean(), server_default="true", nullable=False)
+    is_team_based: Mapped[bool] = mapped_column(Boolean(), server_default="false", nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(), server_default=func.now())
 

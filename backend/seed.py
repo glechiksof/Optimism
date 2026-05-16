@@ -56,16 +56,18 @@ PLAYER_USERNAMES = [
 
 SPORTS = ["Football", "Basketball", "Tennis", "Chess", "Volleyball", "E-sports"]
 
+#                       name                     sport        bracket        cap status     -d  +start +end vis is_team
 TOURNAMENT_TEMPLATES = [
-    ("Spring Cup",          "Football",   "single_elim", 8,  "open",      -3,  +7,  +14, True),
-    ("Winter Classic",      "Basketball", "single_elim", 16, "open",      -1,  +5,  +12, True),
-    ("City Chess Open",     "Chess",      "round_robin", 8,  "open",      0,   +2,  +9,  True),
-    ("Tennis Masters",      "Tennis",     "single_elim", 4,  "open",      -2,  +4,  +6,  True),
-    ("Volleyball League",   "Volleyball", "round_robin", 6,  "closed",    -5,  +1,  +20, True),
-    ("LAN Showdown",        "E-sports",   "single_elim", 8,  "started",   -10, -2,  +5,  True),
-    ("Autumn Invitational", "Football",   "single_elim", 8,  "finished",  -30, -20, -10, True),
-    ("Hidden Draft",        "Football",   "single_elim", 4,  "draft",     0,   +30, +35, False),
-    ("Private Friends Cup", "Tennis",     "single_elim", 4,  "open",      -1,  +3,  +5,  False),
+    ("Spring Cup",          "Football",   "single_elim", 8,  "open",      -3,  +7,  +14, True,  False),
+    ("Winter Classic",      "Basketball", "single_elim", 16, "open",      -1,  +5,  +12, True,  False),
+    ("City Chess Open",     "Chess",      "round_robin", 8,  "open",      0,   +2,  +9,  True,  False),
+    ("Tennis Masters",      "Tennis",     "single_elim", 4,  "open",      -2,  +4,  +6,  True,  False),
+    ("Volleyball League",   "Volleyball", "round_robin", 6,  "closed",    -5,  +1,  +20, True,  False),
+    ("LAN Showdown",        "E-sports",   "single_elim", 8,  "started",   -10, -2,  +5,  True,  False),
+    ("Autumn Invitational", "Football",   "single_elim", 8,  "finished",  -30, -20, -10, True,  False),
+    ("Hidden Draft",        "Football",   "single_elim", 4,  "draft",     0,   +30, +35, False, False),
+    ("Private Friends Cup", "Tennis",     "single_elim", 4,  "open",      -1,  +3,  +5,  False, False),
+    ("Clubs Cup",           "Football",   "single_elim", 4,  "open",      -1,  +5,  +12, True,  True),
 ]
 
 TEAM_TEMPLATES = [
@@ -128,7 +130,7 @@ def seed_tournaments(db, users: dict[str, User]) -> list[Tournament]:
     organizer = users["organizer"]
     now = _now()
     tournaments: list[Tournament] = []
-    for (name, sport, bracket, max_p, status, created_days, start_days, end_days, visible) in TOURNAMENT_TEMPLATES:
+    for (name, sport, bracket, max_p, status, created_days, start_days, end_days, visible, is_team) in TOURNAMENT_TEMPLATES:
         existing = db.query(Tournament).filter(Tournament.name == name).first()
         if existing:
             tournaments.append(existing)
@@ -144,6 +146,7 @@ def seed_tournaments(db, users: dict[str, User]) -> list[Tournament]:
             end_date=now + timedelta(days=end_days),
             status=status,
             is_visible=visible,
+            is_team_based=is_team,
         )
         db.add(t)
         db.flush()
@@ -212,6 +215,8 @@ def seed_participants(db, tournaments: list[Tournament], users: dict[str, User])
     for t in tournaments:
         if t.status == "draft":
             continue  # draft tournaments stay empty
+        if t.is_team_based:
+            continue  # team-based tournaments populated by seed_team_participants
         # decide how many to register
         if t.name == "City Chess Open":
             n = t.max_participants // 2
@@ -245,6 +250,32 @@ def seed_participants(db, tournaments: list[Tournament], users: dict[str, User])
     return all_participants
 
 
+def seed_team_participants(db, tournaments: list[Tournament], teams: list[Team]) -> int:
+    """Register public teams with >=2 members into team-based tournaments."""
+    public_eligible = [t for t in teams if t.is_visible and t.current_size >= 2]
+    count = 0
+    for tournament in tournaments:
+        if not tournament.is_team_based:
+            continue
+        if tournament.status == "draft":
+            continue
+        existing = db.query(TournamentParticipant).filter(
+            TournamentParticipant.tournament_id == tournament.id
+        ).count()
+        if existing > 0:
+            continue
+        target = min(tournament.max_participants, len(public_eligible))
+        chosen = public_eligible[:target]
+        for team in chosen:
+            p = TournamentParticipant(tournament_id=tournament.id, team_id=team.id, user_id=None)
+            db.add(p)
+            count += 1
+        tournament.current_participants = target
+    db.commit()
+    print(f"  team-participants: {count} new")
+    return count
+
+
 def _gen_bracket(db, tournament: Tournament) -> int:
     """Delegate to services/matches.py to keep seed in sync with production logic."""
     from services.matches import generate_matches as _generate
@@ -259,9 +290,45 @@ def _gen_bracket(db, tournament: Tournament) -> int:
         return 0
 
 
+def _complete_match_with_advancement(m: Match, db) -> None:
+    """Mark m as completed (participant_a wins) and propagate winner to the
+    next-round match via stored feeder mapping, falling back to the
+    (match_number+1)//2 formula when columns are NULL (legacy)."""
+    if not m.participant_a_id:
+        return
+    m.winner_id = m.participant_a_id
+    m.status = "completed"
+    m.completed_at = _now()
+
+    if m.feeds_into_match_id and m.feeds_into_slot:
+        target = db.query(Match).filter(Match.id == m.feeds_into_match_id).first()
+        if target:
+            if m.feeds_into_slot == "a":
+                target.participant_a_id = m.winner_id
+            else:
+                target.participant_b_id = m.winner_id
+            return
+    # Fallback for matches without stored feeder mapping.
+    target = (
+        db.query(Match)
+        .filter(
+            Match.tournament_id == m.tournament_id,
+            Match.round_number == m.round_number + 1,
+            Match.match_number == (m.match_number + 1) // 2,
+        )
+        .first()
+    )
+    if target:
+        if target.participant_a_id is None:
+            target.participant_a_id = m.winner_id
+        elif target.participant_b_id is None:
+            target.participant_b_id = m.winner_id
+
+
 def seed_matches(db, tournaments: list[Tournament]) -> int:
     """Generate brackets for closed/started/finished tournaments. Also complete
-    round 1 of the 'started' tournament + all matches of 'finished'."""
+    round 1 of the 'started' tournament and every round of 'finished'.
+    Finishes round-by-round so winners propagate forward correctly."""
     total = 0
     for t in tournaments:
         if t.status not in ("closed", "started", "finished"):
@@ -269,39 +336,44 @@ def seed_matches(db, tournaments: list[Tournament]) -> int:
         created = _gen_bracket(db, t)
         total += created
 
-        if t.status == "finished":
-            # Mark every match as completed; pick participant_a as winner where possible.
-            matches = db.query(Match).filter(Match.tournament_id == t.id).order_by(
-                Match.round_number, Match.match_number
-            ).all()
-            for m in matches:
-                if m.participant_a_id and m.participant_b_id:
-                    m.winner_id = m.participant_a_id
-                    m.status = "completed"
-                    m.completed_at = _now()
-            db.commit()
-        elif t.status == "started":
-            # Complete only round 1.
+        if t.status == "started":
+            # Complete only round 1; rounds 2+ remain pending for manual submission.
             r1 = db.query(Match).filter(
-                Match.tournament_id == t.id, Match.round_number == 1
+                Match.tournament_id == t.id,
+                Match.round_number == 1,
+                Match.status != "completed",
             ).all()
             for m in r1:
                 if m.participant_a_id and m.participant_b_id:
-                    m.winner_id = m.participant_a_id
-                    m.status = "completed"
-                    m.completed_at = _now()
-                    # advance winner to round 2 slot
-                    next_match_number = (m.match_number + 1) // 2
-                    target = db.query(Match).filter(
-                        Match.tournament_id == t.id,
-                        Match.round_number == 2,
-                        Match.match_number == next_match_number,
-                    ).first()
-                    if target:
-                        if target.participant_a_id is None:
-                            target.participant_a_id = m.winner_id
-                        elif target.participant_b_id is None:
-                            target.participant_b_id = m.winner_id
+                    _complete_match_with_advancement(m, db)
+            db.commit()
+        elif t.status == "finished":
+            # Walk every round in order so each winner is advanced before the
+            # next round is processed.
+            max_round = db.query(Match).filter(
+                Match.tournament_id == t.id
+            ).order_by(Match.round_number.desc()).first()
+            if not max_round:
+                continue
+            top_round = max_round.round_number
+            for r in range(1, top_round + 1):
+                # Re-query each round because advancement from the previous
+                # round may have filled NULL slots in this round.
+                matches = db.query(Match).filter(
+                    Match.tournament_id == t.id,
+                    Match.round_number == r,
+                ).order_by(Match.match_number).all()
+                for m in matches:
+                    if m.status == "completed":
+                        continue
+                    # Need at least one participant (byes have only A).
+                    if not m.participant_a_id:
+                        continue
+                    _complete_match_with_advancement(m, db)
+                db.commit()
+            # All matches complete -> transition tournament status.
+            t.status = "finished"
+            t.updated_at = _now()
             db.commit()
     print(f"  matches: {total} created")
     return total
@@ -320,8 +392,9 @@ def seed(reset: bool = False, wipe_users: bool = False):
         print("Seeding...")
         users = seed_users(db)
         tournaments = seed_tournaments(db, users)
-        seed_teams(db, tournaments, users)
+        teams = seed_teams(db, tournaments, users)
         seed_participants(db, tournaments, users)
+        seed_team_participants(db, tournaments, teams)
         seed_matches(db, tournaments)
 
         print("\nDone. Credentials for any seeded user:")

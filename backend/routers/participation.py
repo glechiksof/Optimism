@@ -19,7 +19,13 @@ from services.participation import (
     get_participants,
     get_status,
     get_joined_tournaments,
+    add_team_to_tournament,
 )
+from pydantic import BaseModel
+
+
+class AddTeamRequest(BaseModel):
+    team_id: UUID
 
 
 router = APIRouter()
@@ -70,6 +76,22 @@ def remove_participant_endpoint(
     return None
 
 
+@router.post(
+    "/tournaments/{tournament_id}/teams",
+    response_model=ParticipantResponse,
+    status_code=201,
+)
+def add_team_endpoint(
+    tournament_id: UUID,
+    data: AddTeamRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Organizer-only: add an existing public team to a team-based tournament."""
+    participant = add_team_to_tournament(tournament_id, data.team_id, current_user.id, db)
+    return participant
+
+
 @router.get(
     "/tournaments/{tournament_id}/participants",
     response_model=ParticipantListResponse,
@@ -78,9 +100,32 @@ def list_participants_endpoint(
     tournament_id: UUID,
     db: Session = Depends(get_db),
 ):
-    """List participants for a tournament (public)."""
+    """List participants for a tournament (public). Hydrates username and
+    team_name so the UI can label rows without extra round-trips."""
+    from models.user import User
+    from models.team import Team
     participants = get_participants(tournament_id, db)
-    return ParticipantListResponse(items=participants, total=len(participants))
+    user_ids = {p.user_id for p in participants if p.user_id}
+    team_ids = {p.team_id for p in participants if p.team_id}
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+    teams_by_id = {
+        t.id: t for t in db.query(Team).filter(Team.id.in_(team_ids)).all()
+    } if team_ids else {}
+    items = []
+    for p in participants:
+        items.append({
+            "id": p.id,
+            "tournament_id": p.tournament_id,
+            "user_id": p.user_id,
+            "team_id": p.team_id,
+            "manual_name": p.manual_name,
+            "username": users_by_id.get(p.user_id).username if p.user_id and p.user_id in users_by_id else None,
+            "team_name": teams_by_id.get(p.team_id).name if p.team_id and p.team_id in teams_by_id else None,
+            "registered_at": p.registered_at,
+        })
+    return ParticipantListResponse(items=items, total=len(items))
 
 
 @router.get(

@@ -22,6 +22,7 @@ def create_tournament(data: TournamentCreate, organizer_id: UUID, db: Session) -
         start_date=data.start_date,
         end_date=data.end_date,
         is_visible=data.is_visible,
+        is_team_based=data.is_team_based,
         status="draft",
     )
     db.add(tournament)
@@ -42,13 +43,20 @@ def list_tournaments(
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
+    type_filter: str | None = None,
 ) -> tuple[list[Tournament], int]:
+    """type_filter: None = all, 'solo' = only is_team_based=False,
+    'team' = only is_team_based=True."""
     query = db.query(Tournament).filter(
         Tournament.status != "draft",
         Tournament.is_visible == True,
     )
     if search:
         query = query.filter(Tournament.name.ilike(f"%{search}%"))
+    if type_filter == "solo":
+        query = query.filter(Tournament.is_team_based == False)
+    elif type_filter == "team":
+        query = query.filter(Tournament.is_team_based == True)
     total = query.count()
     items = query.order_by(Tournament.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return items, total
