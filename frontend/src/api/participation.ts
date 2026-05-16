@@ -6,6 +6,8 @@ export interface Participant {
   user_id?: string
   team_id?: string
   manual_name?: string
+  username?: string
+  team_name?: string
   registered_at: string
 }
 
@@ -21,6 +23,11 @@ export interface ParticipationStatus {
 
 export async function joinTournament(id: string, teamId?: string): Promise<Participant> {
   const res = await client.post<Participant>(`/tournaments/${id}/join`, { team_id: teamId ?? null })
+  return res.data
+}
+
+export async function addTeamToTournament(id: string, teamId: string): Promise<Participant> {
+  const res = await client.post<Participant>(`/tournaments/${id}/teams`, { team_id: teamId })
   return res.data
 }
 

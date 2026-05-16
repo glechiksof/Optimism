@@ -13,6 +13,7 @@ export interface Tournament {
   end_date: string
   status: 'draft' | 'open' | 'closed' | 'started' | 'finished'
   is_visible: boolean
+  is_team_based: boolean
   created_at: string
   updated_at: string
 }
@@ -33,6 +34,7 @@ export interface CreateTournamentData {
   start_date: string
   end_date: string
   is_visible: boolean
+  is_team_based?: boolean
 }
 
 export interface UpdateTournamentData {
@@ -62,7 +64,7 @@ export async function getTournament(id: string): Promise<Tournament> {
   return res.data
 }
 
-export async function listTournaments(params?: { search?: string; page?: number; page_size?: number }): Promise<TournamentListResponse> {
+export async function listTournaments(params?: { search?: string; page?: number; page_size?: number; type?: 'solo' | 'team' }): Promise<TournamentListResponse> {
   const res = await client.get<TournamentListResponse>('/tournaments', { params })
   return res.data
 }

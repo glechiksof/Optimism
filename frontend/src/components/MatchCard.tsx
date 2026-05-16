@@ -11,6 +11,7 @@ interface Props {
 
 function participantLabel(p: MatchParticipantInfo | null): string {
   if (!p) return 'TBD'
+  if (p.team_name) return p.team_name
   return p.username ?? p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'Unknown')
 }
 

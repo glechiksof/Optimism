@@ -194,6 +194,7 @@ export async function mockCreateTournament(token: string, data: CreateTournament
         end_date: data.end_date,
         status: 'draft',
         is_visible: data.is_visible,
+        is_team_based: data.is_team_based ?? false,
         created_at: now,
         updated_at: now,
       }
@@ -232,7 +233,7 @@ export async function mockUpdateTournament(token: string, id: string, data: Upda
   })
 }
 
-export async function mockListTournaments(search?: string): Promise<{ items: Tournament[]; total: number; page: number; page_size: number }> {
+export async function mockListTournaments(search?: string, type?: 'solo' | 'team'): Promise<{ items: Tournament[]; total: number; page: number; page_size: number }> {
   return new Promise((resolve) => {
     setTimeout(() => {
       let items = getMockTournaments().filter(
@@ -242,6 +243,8 @@ export async function mockListTournaments(search?: string): Promise<{ items: Tou
         const q = search.toLowerCase()
         items = items.filter((t) => t.name.toLowerCase().includes(q))
       }
+      if (type === 'solo') items = items.filter((t) => !t.is_team_based)
+      else if (type === 'team') items = items.filter((t) => t.is_team_based)
       resolve({ items, total: items.length, page: 1, page_size: 20 })
     }, MOCK_DELAY)
   })
@@ -448,6 +451,9 @@ export async function mockJoinTournament(token: string, tournamentId: string, bo
       const tournaments = getMockTournaments()
       const tournament = tournaments.find((t) => t.id === tournamentId)
       if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      if (tournament.is_team_based) {
+        reject({ response: { data: { message: 'This is a team-based tournament. The organizer adds whole teams; individual sign-ups are disabled.' }, status: 422 } }); return
+      }
       if (tournament.status !== 'open') {
         reject({ response: { data: { message: 'Tournament is not open for registration' }, status: 422 } }); return
       }
@@ -474,10 +480,59 @@ export async function mockJoinTournament(token: string, tournamentId: string, bo
   })
 }
 
-export async function mockListParticipants(tournamentId: string) {
-  return new Promise<{ items: MockParticipant[]; total: number }>((resolve) => {
+export async function mockAddTeamToTournament(token: string, tournamentId: string, teamId: string) {
+  return new Promise<MockParticipant>((resolve, reject) => {
     setTimeout(() => {
-      const items = getMockParticipants().filter((p) => p.tournament_id === tournamentId)
+      const userId = getUserIdFromToken(token)
+      const tournaments = getMockTournaments()
+      const tournament = tournaments.find((t) => t.id === tournamentId)
+      if (!tournament) { reject({ response: { data: { message: 'Tournament not found' }, status: 404 } }); return }
+      if (tournament.organizer_id !== userId) { reject({ response: { data: { message: 'Only the organizer can add teams' }, status: 403 } }); return }
+      if (!tournament.is_team_based) { reject({ response: { data: { message: 'This tournament is not team-based' }, status: 422 } }); return }
+      if (tournament.status !== 'open') { reject({ response: { data: { message: 'Tournament is not open for registration' }, status: 422 } }); return }
+      if (tournament.current_participants >= tournament.max_participants) {
+        reject({ response: { data: { message: 'Tournament is full' }, status: 422 } }); return
+      }
+      const team = getMockTeams().find((t) => t.id === teamId)
+      if (!team) { reject({ response: { data: { message: 'Team not found' }, status: 404 } }); return }
+      if (!team.is_visible) { reject({ response: { data: { message: 'Only public teams can be added to a tournament' }, status: 422 } }); return }
+      if (team.current_size < 2) { reject({ response: { data: { message: 'Team needs at least 2 members to enter a tournament' }, status: 422 } }); return }
+      const parts = getMockParticipants()
+      if (parts.some((p) => p.tournament_id === tournamentId && p.team_id === teamId)) {
+        reject({ response: { data: { message: 'Team is already in this tournament' }, status: 409 } }); return
+      }
+      const participant: MockParticipant = {
+        id: Date.now().toString(),
+        tournament_id: tournamentId,
+        user_id: undefined,
+        team_id: teamId,
+        registered_at: new Date().toISOString(),
+      }
+      parts.push(participant)
+      saveMockParticipants(parts)
+      tournament.current_participants += 1
+      saveMockTournaments(tournaments)
+      resolve(participant)
+    }, MOCK_DELAY)
+  })
+}
+
+interface HydratedParticipant extends MockParticipant {
+  username?: string
+  team_name?: string
+}
+
+export async function mockListParticipants(tournamentId: string) {
+  return new Promise<{ items: HydratedParticipant[]; total: number }>((resolve) => {
+    setTimeout(() => {
+      const rows = getMockParticipants().filter((p) => p.tournament_id === tournamentId)
+      const users = getMockUsers()
+      const teams = getMockTeams()
+      const items: HydratedParticipant[] = rows.map((p) => ({
+        ...p,
+        username: p.user_id ? users.find((u) => u.id === p.user_id)?.username : undefined,
+        team_name: p.team_id ? teams.find((t) => t.id === p.team_id)?.name : undefined,
+      }))
       resolve({ items, total: items.length })
     }, MOCK_DELAY)
   })

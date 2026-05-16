@@ -6,6 +6,7 @@ export interface MatchParticipantInfo {
   team_id?: string
   manual_name?: string
   username?: string
+  team_name?: string
 }
 
 export interface Match {

@@ -13,6 +13,7 @@ import {
 import { listMatches, generateMatches, getStandings, type Match, type StandingsRow } from '../api/matches'
 import { useAuthStore } from '../store/authStore'
 import JoinTournamentButton from '../components/JoinTournamentButton'
+import TournamentTeamPicker from '../components/TournamentTeamPicker'
 import BracketView from '../components/BracketView'
 import Toast from '../components/ui/Toast'
 import { getErrorMessage } from '../utils/errors'
@@ -249,8 +250,22 @@ export default function TournamentDetail() {
           </div>
         )}
 
-        {/* Join section */}
-        {user && !isOrganizer && (
+        {/* Organizer team picker (team-based tournaments only) */}
+        {isOrganizer && tournament.is_team_based && tournament.status !== 'finished' && (
+          <div style={cardStyle}>
+            <h2 style={sectionTitle}>Add Teams</h2>
+            <TournamentTeamPicker
+              tournamentId={tournament.id}
+              registeredTeamIds={new Set(participants.map((p) => p.team_id).filter((x): x is string => !!x))}
+              isFull={isFull}
+              status={tournament.status}
+              onAdded={load}
+            />
+          </div>
+        )}
+
+        {/* Solo join section (hidden on team-based tournaments) */}
+        {user && !isOrganizer && !tournament.is_team_based && (
           <div style={cardStyle}>
             <h2 style={sectionTitle}>Registration</h2>
             <JoinTournamentButton
@@ -329,7 +344,7 @@ export default function TournamentDetail() {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {participants.map((p) => (
                 <li key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-                  <span>{p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'Unknown')}</span>
+                  <span>{p.team_name ?? p.username ?? p.manual_name ?? (p.user_id ? `User #${p.user_id.slice(0, 8)}` : 'Unknown')}</span>
                   {p.team_id && <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>(team)</span>}
                   {canKick && (
                     <button
