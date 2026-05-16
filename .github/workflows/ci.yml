@@ -54,9 +54,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Import check
-        run: python -c "import main"
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost/dummy
-          JWT_SECRET: ci-placeholder-secret-minimum-32-chars
-          ENVIRONMENT: development
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
