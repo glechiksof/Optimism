@@ -32,7 +32,19 @@ export default function Teams() {
         {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading...</p>}
         {error && <p style={{ color: 'var(--color-error)' }}>{error}</p>}
         {!loading && !error && teams.length === 0 && (
-          <p style={{ color: 'var(--color-text-muted)' }}>No teams yet.</p>
+          <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--color-text-muted)' }}>
+            <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>No teams yet.</p>
+            {user ? (
+              <button
+                onClick={() => navigate('/teams/create')}
+                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}
+              >
+                Create the first team →
+              </button>
+            ) : (
+              <p style={{ fontSize: '0.875rem' }}>Log in to create one.</p>
+            )}
+          </div>
         )}
 
         <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>

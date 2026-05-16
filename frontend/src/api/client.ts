@@ -97,7 +97,7 @@ if (USE_MOCK) {
 
     if (method === 'post' && url.match(/^\/teams\/[^/]+\/join$/)) {
       const id = url.split('/')[2]
-      return mockJoinTeam(token, id).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
+      return mockJoinTeam(token, id, body?.token ?? null).then((data) => ({ data, status: 201, statusText: 'Created', headers: {}, config }))
     }
 
     if (method === 'get' && url.match(/^\/teams\/[^/]+$/) && !url.includes('/tokens')) {

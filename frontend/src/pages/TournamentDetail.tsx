@@ -14,6 +14,7 @@ import { listMatches, generateMatches, getStandings, type Match, type StandingsR
 import { useAuthStore } from '../store/authStore'
 import JoinTournamentButton from '../components/JoinTournamentButton'
 import BracketView from '../components/BracketView'
+import Toast from '../components/ui/Toast'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -21,6 +22,14 @@ const STATUS_LABELS: Record<string, string> = {
   closed: 'Registration closed',
   started: 'In progress',
   finished: 'Finished',
+}
+
+const STATUS_PILL_COLORS: Record<string, { bg: string; fg: string }> = {
+  draft:    { bg: '#e5e7eb', fg: '#6b7280' },  // grey
+  open:     { bg: '#dcfce7', fg: '#15803d' },  // green
+  closed:   { bg: '#fef3c7', fg: '#92400e' },  // amber
+  started:  { bg: '#dbeafe', fg: '#1d4ed8' },  // blue
+  finished: { bg: '#f3e8ff', fg: '#6b21a8' },  // purple
 }
 
 export default function TournamentDetail() {
@@ -38,6 +47,7 @@ export default function TournamentDetail() {
   const [generating, setGenerating] = useState(false)
   const [actionError, setActionError] = useState('')
   const [transitioning, setTransitioning] = useState(false)
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null)
 
   async function load() {
     if (!id) return
@@ -86,6 +96,7 @@ export default function TournamentDetail() {
     try {
       await generateMatches(id)
       await load()
+      setToast({ message: 'Bracket generated', variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? 'Failed to generate matches')
     } finally {
@@ -101,6 +112,8 @@ export default function TournamentDetail() {
       const fn = action === 'publish' ? publishTournament : action === 'close' ? closeTournament : startTournament
       await fn(id)
       await load()
+      const labels = { publish: 'Tournament published', close: 'Registration closed', start: 'Tournament started' }
+      setToast({ message: labels[action], variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? `Failed to ${action} tournament`)
     } finally {
@@ -115,6 +128,7 @@ export default function TournamentDetail() {
     try {
       await leaveTournament(id)
       await load()
+      setToast({ message: 'You left the tournament', variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? 'Failed to leave tournament')
     }
@@ -128,6 +142,7 @@ export default function TournamentDetail() {
     try {
       await removeParticipant(id, p.id)
       await load()
+      setToast({ message: 'Participant removed', variant: 'success' })
     } catch (e: any) {
       setActionError(e?.response?.data?.message ?? 'Failed to remove participant')
     }
@@ -155,6 +170,7 @@ export default function TournamentDetail() {
 
   return (
     <div className="page">
+      {toast && <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />}
       <div className="container" style={{ maxWidth: 920 }}>
         {/* Privacy banner */}
         {!tournament.is_visible && (
@@ -174,7 +190,9 @@ export default function TournamentDetail() {
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
               <span style={pillStyle('primary')}>{tournament.sport_type}</span>
               <span style={pillStyle('muted')}>{tournament.bracket_type === 'single_elim' ? 'Single elimination' : 'Round robin'}</span>
-              <span style={pillStyle('muted')}>{STATUS_LABELS[tournament.status] ?? tournament.status}</span>
+              <span style={statusPillStyle(tournament.status)}>
+                {STATUS_LABELS[tournament.status] ?? tournament.status}
+              </span>
             </div>
           </div>
           <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '0.875rem' }}>← Back</button>
@@ -258,7 +276,12 @@ export default function TournamentDetail() {
         {/* Bracket */}
         <div style={cardStyle}>
           <h2 style={sectionTitle}>Bracket</h2>
-          <BracketView matches={matches} />
+          <BracketView
+            matches={matches}
+            tournamentId={tournament.id}
+            canPickWinner={isOrganizer && tournament.status === 'started'}
+            onResult={load}
+          />
         </div>
 
         {/* Standings (round-robin only) */}
@@ -350,6 +373,18 @@ function pillStyle(variant: 'primary' | 'muted'): React.CSSProperties {
     padding: '0.2rem 0.6rem',
     borderRadius: 'var(--border-radius-pill)',
     fontWeight: 500,
+  }
+}
+
+function statusPillStyle(status: string): React.CSSProperties {
+  const c = STATUS_PILL_COLORS[status] ?? { bg: 'var(--color-border)', fg: 'var(--color-text-muted)' }
+  return {
+    fontSize: '0.75rem',
+    background: c.bg,
+    color: c.fg,
+    padding: '0.2rem 0.6rem',
+    borderRadius: 'var(--border-radius-pill)',
+    fontWeight: 600,
   }
 }
 
