@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import Toast from '../components/ui/Toast'
 import { createTeam } from '../api/teams'
+import { getErrorMessage } from '../utils/errors'
 
 const JOIN_METHOD_OPTIONS = [
   { value: 'team_page', label: 'Open (anyone can join)' },
@@ -68,9 +69,8 @@ export default function CreateTeam() {
       })
       setToast({ message: 'Team created!', variant: 'success' })
       setTimeout(() => navigate(`/teams/${team.id}`), 1000)
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.detail || 'Failed to create team'
-      setApiError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    } catch (err: unknown) {
+      setApiError(getErrorMessage(err, 'Failed to create team'))
     } finally {
       setLoading(false)
     }

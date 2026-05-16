@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 import {
   initMockData,
   mockRegister, mockLogin, mockGetMe, mockUpdateMe,
@@ -11,6 +11,7 @@ import {
   mockLeaveTeam, mockRemoveMember,
   mockGenerateToken, mockGetTokens, mockRevokeToken,
   mockJoinedTournaments, mockMyStats, mockStandings,
+  mockUpdateTeam, mockDeleteTeam, mockDeleteTournament, mockSubmitMatchResult,
 } from './mock'
 
 const USE_MOCK = import.meta.env.VITE_API_BASE_URL === 'mock'
@@ -42,10 +43,11 @@ client.interceptors.request.use((config) => {
 })
 
 if (USE_MOCK) {
-  const mockAdapter = (config: any) => {
+  const mockAdapter = (config: InternalAxiosRequestConfig) => {
     const url = config.url || ''
     const method = config.method || 'get'
-    const token = config.headers?.Authorization?.replace('Bearer ', '') || ''
+    const authHeader = config.headers?.Authorization
+    const token = typeof authHeader === 'string' ? authHeader.replace('Bearer ', '') : ''
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : (config.data ?? {})
 
     if (method === 'post' && url.includes('/auth/register')) {
@@ -193,9 +195,34 @@ if (USE_MOCK) {
       return mockMyStats(token).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
     }
 
+    if (method === 'patch' && url.match(/^\/teams\/[^/]+$/) && !url.includes('/tokens')) {
+      const id = url.split('/').pop()!
+      return mockUpdateTeam(token, id, body).then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/teams\/[^/]+$/) && !url.includes('/tokens') && !url.includes('/leave') && !url.includes('/members')) {
+      const id = url.split('/').pop()!
+      return mockDeleteTeam(token, id).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'delete' && url.match(/^\/tournaments\/[^/]+$/) && !url.includes('/leave') && !url.includes('/participants')) {
+      const id = url.split('/').pop()!
+      return mockDeleteTournament(token, id).then(() => ({ data: null, status: 204, statusText: 'No Content', headers: {}, config }))
+    }
+
+    if (method === 'patch' && url.match(/^\/tournaments\/[^/]+\/matches\/[^/]+\/result$/)) {
+      const parts = url.split('/')
+      return mockSubmitMatchResult(token, parts[2], parts[4], body.winner_participant_id)
+        .then((data) => ({ data, status: 200, statusText: 'OK', headers: {}, config }))
+    }
+
     return Promise.reject(new Error('Unknown mock endpoint'))
   }
 
+  // Axios's adapter type expects a richer Promise<AxiosResponse> than our
+  // partial mock returns; the runtime contract is satisfied so we suppress
+  // the structural mismatch here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client.defaults.adapter = mockAdapter as any
 }
 

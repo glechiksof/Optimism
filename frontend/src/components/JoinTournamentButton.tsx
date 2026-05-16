@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { joinTournament } from '../api/participation'
+import { getErrorMessage } from '../utils/errors'
 
 interface Props {
   tournamentId: string
@@ -46,8 +47,8 @@ export default function JoinTournamentButton({
     try {
       await joinTournament(tournamentId)
       onJoinSuccess()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.response?.data?.detail ?? 'Failed to join')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to join'))
     } finally {
       setLoading(false)
     }

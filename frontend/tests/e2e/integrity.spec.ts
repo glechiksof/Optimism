@@ -10,8 +10,11 @@ test.describe('Integrity pass — leave, transitions, privacy, stats', () => {
   test('private tournament shows privacy banner if visible flag false', async ({ page }) => {
     // Visit a known private tournament id (relies on seed: Hidden Draft, but route exists).
     await page.goto('/tournaments/non-existent-private-id')
-    // Either banner or not-found CTA must be visible.
-    await expect(page.locator('text=/private|not found|Back to tournaments/i')).toBeVisible()
+    // Bogus id resolves to "Tournament not found" + back-to-list CTA.
+    // Use first() to tolerate two strict-mode matches on the same regex.
+    await expect(
+      page.locator('text=/Tournament not found|Back to tournaments/i').first(),
+    ).toBeVisible()
   })
 
   test('back-to-list CTA on tournament not-found', async ({ page }) => {

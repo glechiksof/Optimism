@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
 import { login } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
+import { getErrorMessage } from '../utils/errors'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -34,8 +35,8 @@ export default function Login() {
       const res = await login({ email, password })
       setAuth(res.access_token, res.user)
       navigate('/')
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Login failed'))
     } finally {
       setLoading(false)
     }

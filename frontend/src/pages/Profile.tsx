@@ -4,6 +4,7 @@ import { updateMe } from '../api/users'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import FormError from '../components/ui/FormError'
+import { getErrorMessage } from '../utils/errors'
 
 const MAX_AVATAR_BYTES = 200 * 1024  // 200 KB cap on base64 payload to keep DB row small
 
@@ -41,8 +42,8 @@ export default function Profile() {
       setSuccess('Profile updated!')
       setIsEditing(false)
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update profile')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to update profile'))
     } finally {
       setLoading(false)
     }
@@ -70,8 +71,8 @@ export default function Profile() {
       }
       setSuccess('Avatar updated')
       setTimeout(() => setSuccess(''), 3000)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Failed to upload avatar')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to upload avatar'))
     } finally {
       setAvatarUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

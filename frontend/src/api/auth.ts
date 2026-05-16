@@ -18,7 +18,6 @@ export const register = (data: { email: string; username: string; password: stri
 export const login = (data: { email: string; password: string }): Promise<AuthResponse> =>
   client.post('/auth/login', data).then((r) => r.data)
 
-export const getMe = () => client.get('/users/me').then((r) => r.data)
-
-export const updateMe = (data: { username?: string; avatar_url?: string }) =>
-  client.patch('/users/me', data).then((r) => r.data)
+// Note: prefer `getMe` / `updateMe` from `./users` (fully typed).
+// Re-exported here for backwards-compat with older imports.
+export { getMe, updateMe } from './users'
