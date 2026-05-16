@@ -1,5 +1,4 @@
-import json
-from pydantic import field_validator, model_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,20 +9,25 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET: str
     JWT_EXPIRES_IN: int = 7
-    CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    # Keep as str so pydantic-settings doesn't JSON-decode before we can parse it.
+    # Use cors_origins_list property wherever a list is needed.
+    CORS_ORIGINS: str = "http://localhost:5173"
     ENVIRONMENT: str = "development"
 
     model_config = SettingsConfigDict(env_file=".env")
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: object) -> object:
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                return json.loads(v)
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        import json as _json
+        v = self.CORS_ORIGINS.strip()
+        if not v:
+            return ["http://localhost:5173"]
+        if v.startswith("["):
+            try:
+                return _json.loads(v)
+            except Exception:
+                pass
+        return [o.strip() for o in v.split(",") if o.strip()]
 
     @model_validator(mode="after")
     def validate_jwt_secret(self) -> "Settings":
