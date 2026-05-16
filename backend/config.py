@@ -1,4 +1,5 @@
-from pydantic import model_validator
+import json
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,16 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     model_config = SettingsConfigDict(env_file=".env")
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: object) -> object:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return json.loads(v)
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     @model_validator(mode="after")
     def validate_jwt_secret(self) -> "Settings":
