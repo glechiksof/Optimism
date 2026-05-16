@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Tournament Organizer</title>
+    <script>
+      // GitHub Pages SPA redirect: preserve the path as a query param,
+      // then the main app reads it back and replaces the URL.
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 2).join('/') +
+        '/?p=' + encodeURIComponent(l.pathname.slice(1) + l.search) +
+        (l.hash || '')
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
