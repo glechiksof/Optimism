@@ -5,7 +5,7 @@ from uuid import UUID
 from datetime import datetime
 
 from database import get_db
-from dependencies import get_current_user
+from dependencies import get_current_user, get_optional_user
 from exceptions import AppError
 from models.user import User
 from models.join_token import JoinToken
@@ -57,10 +57,14 @@ def create_team_endpoint(
 def list_teams_endpoint(
     tournament_id: UUID | None = Query(None),
     visible_only: bool = Query(True),
+    requester: User | None = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
-    """List teams (public endpoint)."""
-    teams = list_teams(tournament_id, visible_only, db)
+    """List teams. Anon callers always see only public teams.
+    Authenticated callers may pass visible_only=false to additionally see
+    private teams they own or are members of."""
+    requester_id = requester.id if requester else None
+    teams = list_teams(tournament_id, visible_only, db, requester_id=requester_id)
     return TeamListResponse(items=teams, total=len(teams))
 
 

@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,21 +14,19 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env")
 
-    @field_validator("JWT_SECRET")
-    @classmethod
-    def validate_jwt_secret(cls, v: str, info) -> str:
-        # Allow weak default only in development mode for local dev; reject in any other env.
-        # Production must set a strong (>=32 char) secret distinct from the example.
-        if v == DEFAULT_INSECURE_SECRET:
-            env = info.data.get("ENVIRONMENT", "development")
-            if env != "development":
-                raise ValueError(
-                    "JWT_SECRET is set to the example placeholder. "
-                    "Set a strong secret (>=32 random chars) in production."
-                )
-        if len(v) < 32:
+    @model_validator(mode="after")
+    def validate_jwt_secret(self) -> "Settings":
+        """Runs after every field is populated, so ENVIRONMENT is available
+        regardless of declaration order. Rejects weak/placeholder secrets
+        outside development."""
+        if len(self.JWT_SECRET) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters")
-        return v
+        if self.JWT_SECRET == DEFAULT_INSECURE_SECRET and self.ENVIRONMENT != "development":
+            raise ValueError(
+                "JWT_SECRET is set to the example placeholder. "
+                "Set a strong secret (>=32 random chars) outside development."
+            )
+        return self
 
 
 settings = Settings()
