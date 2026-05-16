@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -37,8 +37,9 @@ class TournamentCreate(BaseModel):
         # Reject past start dates so users can't accidentally schedule a
         # tournament that has already started. Compare as naive UTC since
         # both sides are tz-naive here.
-        now = datetime.utcnow()
-        if v <= now:
+        now = datetime.now(timezone.utc)
+        v_aware = v if v.tzinfo is not None else v.replace(tzinfo=timezone.utc)
+        if v_aware <= now:
             raise ValueError("Start date must be in the future")
         return v
 
@@ -46,8 +47,11 @@ class TournamentCreate(BaseModel):
     @classmethod
     def validate_end_after_start(cls, v: datetime, info) -> datetime:
         start = info.data.get("start_date")
-        if start and v <= start:
-            raise ValueError("End date must be after start date")
+        if start:
+            v_cmp = v if v.tzinfo is not None else v.replace(tzinfo=timezone.utc)
+            s_cmp = start if start.tzinfo is not None else start.replace(tzinfo=timezone.utc)
+            if v_cmp <= s_cmp:
+                raise ValueError("End date must be after start date")
         return v
 
 
