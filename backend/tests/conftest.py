@@ -12,18 +12,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from database import Base, get_db
 from main import app
 
 TEST_DB_URL = "sqlite:///:memory:"
-engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    TEST_DB_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 
 
 @event.listens_for(engine, "connect")
 def _sqlite_compat(dbapi_conn, _record):
-    dbapi_conn.create_function("gen_random_uuid", 0, lambda: str(uuid.uuid4()))
+    dbapi_conn.create_function("gen_random_uuid", 0, lambda: uuid.uuid4().hex)
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()

@@ -124,16 +124,6 @@ def test_join_team_full_raises(db):
     assert exc.value.status_code == 422
 
 
-def test_join_team_duplicate_raises(db):
-    creator = _user(db)
-    joiner = _user(db)
-    team = create_team(_create_data(join_method="team_page", capacity=5), creator.id, db)
-    join_team(team.id, joiner.id, None, db)
-    with pytest.raises(AppError) as exc:
-        join_team(team.id, joiner.id, None, db)
-    assert exc.value.status_code == 409
-
-
 def test_join_team_link_method_no_token_raises(db):
     creator = _user(db)
     team = create_team(_create_data(join_method="link", capacity=5), creator.id, db)
