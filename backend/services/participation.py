@@ -34,6 +34,12 @@ def join_tournament(
     """Register a user (optionally as part of a team) for a tournament."""
     tournament = _get_tournament_for_update(tournament_id, db)
 
+    if tournament.is_team_based:
+        raise AppError(
+            422,
+            "This is a team-based tournament. The organizer adds whole teams; individual sign-ups are disabled.",
+        )
+
     if tournament.status not in JOINABLE_STATUSES:
         raise AppError(422, "Tournament is not open for registration")
 
@@ -103,6 +109,66 @@ def remove_participant(
     if tournament.current_participants > 0:
         tournament.current_participants -= 1
     db.commit()
+
+
+MIN_TEAM_MEMBERS_FOR_TOURNAMENT = 2
+
+
+def add_team_to_tournament(
+    tournament_id: UUID, team_id: UUID, organizer_id: UUID, db: Session
+) -> TournamentParticipant:
+    """Organizer adds an existing public team to a team-based tournament.
+    Inserts a single TournamentParticipant row with team_id set and user_id=NULL.
+    The team's own members do not individually register."""
+    from models.membership import TeamMember
+
+    tournament = _get_tournament_for_update(tournament_id, db)
+    if tournament.organizer_id != organizer_id:
+        raise AppError(403, "Only the organizer can add teams")
+    if not tournament.is_team_based:
+        raise AppError(422, "This tournament is not team-based")
+    if tournament.status != "open":
+        raise AppError(422, "Tournament is not open for registration")
+    if tournament.current_participants >= tournament.max_participants:
+        raise AppError(422, "Tournament is full")
+
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise AppError(404, "Team not found")
+    if not team.is_visible:
+        raise AppError(422, "Only public teams can be added to a tournament")
+
+    member_count = db.query(TeamMember).filter(TeamMember.team_id == team_id).count()
+    if member_count < MIN_TEAM_MEMBERS_FOR_TOURNAMENT:
+        raise AppError(
+            422,
+            f"Team needs at least {MIN_TEAM_MEMBERS_FOR_TOURNAMENT} members to enter a tournament",
+        )
+
+    # Duplicate check (DB also enforces uq_tournament_team partial unique index).
+    existing = db.query(TournamentParticipant).filter(
+        and_(
+            TournamentParticipant.tournament_id == tournament_id,
+            TournamentParticipant.team_id == team_id,
+        )
+    ).first()
+    if existing:
+        raise AppError(409, "Team is already in this tournament")
+
+    participant = TournamentParticipant(
+        tournament_id=tournament_id,
+        team_id=team_id,
+        user_id=None,
+    )
+    db.add(participant)
+    tournament.current_participants += 1
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise AppError(409, "Team is already in this tournament")
+    db.refresh(participant)
+    return participant
 
 
 def get_participants(tournament_id: UUID, db: Session) -> list[TournamentParticipant]:

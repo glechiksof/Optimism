@@ -14,6 +14,7 @@ class TournamentCreate(BaseModel):
     start_date: datetime
     end_date: datetime
     is_visible: bool = True
+    is_team_based: bool = False
 
     @field_validator("bracket_type")
     @classmethod
@@ -79,6 +80,7 @@ class TournamentResponse(BaseModel):
     end_date: datetime
     status: str
     is_visible: bool
+    is_team_based: bool
     created_at: datetime
     updated_at: datetime
 

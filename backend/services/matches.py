@@ -24,16 +24,23 @@ def _load_participant_info(participant_id: UUID | None, db: Session) -> MatchPar
     if not p:
         return None
     username = None
+    team_name = None
     if p.user_id:
         user = db.query(User).filter(User.id == p.user_id).first()
         if user:
             username = user.username
+    if p.team_id:
+        from models.team import Team
+        team = db.query(Team).filter(Team.id == p.team_id).first()
+        if team:
+            team_name = team.name
     return MatchParticipantInfo(
         id=p.id,
         user_id=p.user_id,
         team_id=p.team_id,
         manual_name=p.manual_name,
         username=username,
+        team_name=team_name,
     )
 
 

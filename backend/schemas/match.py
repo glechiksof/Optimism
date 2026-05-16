@@ -10,6 +10,7 @@ class MatchParticipantInfo(BaseModel):
     team_id: Optional[UUID] = None
     manual_name: Optional[str] = None
     username: Optional[str] = None
+    team_name: Optional[str] = None
 
     class Config:
         from_attributes = True

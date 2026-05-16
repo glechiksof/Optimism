@@ -14,6 +14,8 @@ class ParticipantResponse(BaseModel):
     user_id: Optional[UUID] = None
     team_id: Optional[UUID] = None
     manual_name: Optional[str] = None
+    username: Optional[str] = None
+    team_name: Optional[str] = None
     registered_at: datetime
 
     class Config:
