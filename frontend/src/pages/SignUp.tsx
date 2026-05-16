@@ -52,8 +52,8 @@ export default function SignUp() {
     <div className="auth-layout">
       <div className="auth-layout__panel--left">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', width: '100%', maxWidth: 420 }}>
-          <img src="/title+logo.png" alt="Tournament Organizer" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
-          <img src="/banana.png" alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}title+logo.png`} alt="Tournament Organizer" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}banana.png`} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
           <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', marginTop: '0.5rem' }}>
             Create, Join and Play
           </h2>
